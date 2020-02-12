@@ -20,40 +20,42 @@
  */
 package org.openscience.cdk.tools;
 
+import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
+import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.graph.ConnectivityChecker;
-import org.openscience.cdk.interfaces.IAtom;
-import org.openscience.cdk.interfaces.IAtomContainer;
+import org.openscience.cdk.interfaces.*;
+import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
 
 import java.util.Objects;
 import java.util.stream.IntStream;
 
 /**
- *
+ * This class gives utility methods for using ErtlFunctionalGroupsFinder.
  *
  * @author Jonas Schaub
  * @version 1.0.0.0
  */
 public class ErtlFunctionalGroupsFinderUtility {
-
     //<editor-fold desc="Private static final class constants">
     /**
-     *
+     * Atomic numbers that ErtlFunctionalGroupsFinder accepts, see getValidAtomicNumbers()
      */
     private static final int[] VALID_ATOMIC_NUMBERS = new int[] {1,2,6,7,8,9,10,15,16,17,18,34,35,36,53,54,86};
     //</editor-fold>
-
+    //
     //<editor-fold desc="Constructors">
+    //TODO: Implement non-static methods and set up logging files in this constructor?
     /**
-     *
+     * Constructor (currently empty)
      */
     public ErtlFunctionalGroupsFinderUtility() {
 
     }
     //</editor-fold>
-
+    //
     //<editor-fold desc="Public static final properties">
     /**
-     * Returns an int array containing all atomic numbers that can be passed on to ErtlFunctionalGroupsFinder.find().
+     * Returns an integer array containing all atomic numbers that can be passed on to ErtlFunctionalGroupsFinder.find().
      * All other atomic numbers are invalid because they represent metal, metalloid or pseudo ('R') atoms.
      *
      * @return all valid atomic numbers for ErtlFunctionalGroupsFinder.find()
@@ -62,8 +64,9 @@ public class ErtlFunctionalGroupsFinderUtility {
         return ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS;
     }
     //</editor-fold>
-
+    //
     //<editor-fold desc="Public static methods">
+    //<editor-fold desc="Queries for filtering">
     /**
      * Checks whether the given molecule consists of two or more unconnected structures, e.g. ion and counter-ion.
      *
@@ -72,8 +75,9 @@ public class ErtlFunctionalGroupsFinderUtility {
      * @throws NullPointerException if the given molecule is 'null'
      */
     public static boolean isStructureUnconnected(IAtomContainer aMolecule) throws NullPointerException {
-        Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
-        return (!ConnectivityChecker.isConnected(aMolecule));
+        Objects.requireNonNull(aMolecule, "Given molecule is 'null'");
+        boolean tmpIsConnected = ConnectivityChecker.isConnected(aMolecule);
+        return (!tmpIsConnected);
     }
 
     /**
@@ -125,12 +129,13 @@ public class ErtlFunctionalGroupsFinderUtility {
      *
      * @param anAtom the atom to check
      * @return true, if the atom is charged
-     * @throws NullPointerException if the given atom is 'null'
+     * @throws NullPointerException if the given atom is 'null' or its formal charge
      */
     public static boolean isAtomCharged(IAtom anAtom) throws NullPointerException {
         Objects.requireNonNull(anAtom, "Given atom is 'null'.");
         Integer tmpFormalCharge = anAtom.getFormalCharge();
-        return (tmpFormalCharge!= 0 && tmpFormalCharge != null);
+        Objects.requireNonNull(tmpFormalCharge, "Formal charge is 'null'.");
+        return (tmpFormalCharge.intValue() != 0);
     }
 
     /**
@@ -139,16 +144,15 @@ public class ErtlFunctionalGroupsFinderUtility {
      * but should be discarded.
      *
      * @param anAtom the atom to check
-     * @return true, if the atomic number is invalid
-     * @throws NullPointerException if the given atom is 'null'
+     * @return true, if the atomic number is invalid or 'null'
+     * @throws NullPointerException if the given atom is 'null' or its atomic number
      */
     public static boolean isAtomicNumberInvalid(IAtom anAtom) throws NullPointerException {
         Objects.requireNonNull(anAtom, "Given atom is 'null'.");
         Integer tmpAtomicNumber = anAtom.getAtomicNumber();
-        if (tmpAtomicNumber == null) {
-            return false;
-        }
-        boolean tmpIsAtomicNumberValid = IntStream.of(ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS).anyMatch(x -> x == tmpAtomicNumber);
+        Objects.requireNonNull(tmpAtomicNumber, "Atomic number is 'null'.");
+        int tmpAtomicNumberInt = tmpAtomicNumber.intValue();
+        boolean tmpIsAtomicNumberValid = IntStream.of(ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS).anyMatch(x -> x == tmpAtomicNumberInt);
         return !tmpIsAtomicNumberValid;
     }
 
@@ -181,5 +185,93 @@ public class ErtlFunctionalGroupsFinderUtility {
         return false;
     }
     //</editor-fold>
+    //
+    //<editor-fold desc="Preprocessing methods">
+    /**
+     * Returns the biggest unconnected component/structure of the given atom container, judging by the atom count. To
+     * pre-check whether the atom container consists of multiple unconnected components, use isStructureUnconnected().
+     * All set properties of aMolecule will be set as properties of the returned atom container.<br>
+     *     Iterates through all unconnected components in the given atom container, so the method scales linearly with
+     *     O(n) with n: number of unconnected components.
+     *
+     * @param aMolecule the molecule whose biggest unconnected component should be found
+     * @return the biggest (judging by the atom count) unconnected component of the given atom container
+     * @throws NullPointerException if aMolecule is null or the biggest component
+     */
+    public static IAtomContainer selectBiggestUnconnectedComponent(IAtomContainer aMolecule) throws NullPointerException {
+        Objects.requireNonNull(aMolecule, "Given molecules is 'null'.");
+        IAtomContainerSet tmpUnconnectedComponentsSet = ConnectivityChecker.partitionIntoMolecules(aMolecule);
+        IAtomContainer tmpBiggestComponent = null;
+        for (IAtomContainer tmpComponent : tmpUnconnectedComponentsSet.atomContainers()) {
+            if (Objects.isNull(tmpBiggestComponent) || tmpBiggestComponent.getAtomCount() < tmpComponent.getAtomCount()) {
+                tmpBiggestComponent = tmpComponent;
+            }
+        }
+        Objects.requireNonNull(tmpBiggestComponent, "The resulting biggest component is 'null'.");
+        tmpBiggestComponent.setProperties(aMolecule.getProperties());
+        return tmpBiggestComponent;
+    }
 
+    /**
+     * Neutralizes charged atoms in the given atom container by zeroing the formal atomic charges and filling up free
+     * valences with implicit hydrogen atoms (according to the CDK atom types). This procedure allows a more general
+     * charge treatment than a pre-defined transformation list but may produce “wrong” structures, e.g. it turns a
+     * nitro NO2 group into a structure represented by the SMILES code “[H]O[N](=O)*” with an uncharged four-bonded
+     * nitrogen atom (other examples are “*[N](*)(*)*”, “[C]#[N]*” or “*S(*)(*)*”). Thus an improved charge
+     * neutralization scheme is desirable for future implementations. <br>
+     *     Iterates through all atoms in the given atom container, so the method scales linearly with
+     *     O(n) with n: number of atoms.
+     *
+     * @param aMolecule the molecule to be neutralized
+     * @return the same IAtomContainer instance as aMolecule but with neutralized charges
+     * @throws NullPointerException if aMolecule is 'null' or one of its atoms
+     * @throws CDKException if no matching atom type can be determined for one atom or there is a problem with adding
+     * the implicit hydrogen atoms.
+     */
+    public static IAtomContainer neutralizeCharges(IAtomContainer aMolecule) throws NullPointerException, CDKException {
+        Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
+        Iterable<IAtom> tmpAtoms = aMolecule.atoms();
+        for (IAtom tmpAtom : tmpAtoms) {
+                tmpAtom = ErtlFunctionalGroupsFinderUtility.neutralizeCharges(tmpAtom, aMolecule);
+        }
+        return aMolecule;
+    }
+
+    //TODO: Add doc!
+    /**
+     *
+     */
+    public static IAtom neutralizeCharges(IAtom anAtom, IAtomContainer aParentMolecule) throws NullPointerException, CDKException {
+        Objects.requireNonNull(anAtom, "Given atom is 'null'.");
+        boolean tmpIsAtomInMolecule = aParentMolecule.contains(anAtom);
+        if (!tmpIsAtomInMolecule) {
+            throw new CDKException("Given atom is not part of the given atom container.");
+        }
+        IAtom tmpAtom = anAtom;
+        Integer tmpFormalChargeObject = tmpAtom.getFormalCharge();
+        if (Objects.isNull(tmpFormalChargeObject)) {
+            return tmpAtom;
+        }
+        int tmpFormalCharge = tmpFormalChargeObject.intValue();
+        if (tmpFormalCharge != 0) {
+            tmpAtom.setFormalCharge(0);
+            IChemObjectBuilder tmpBuilder = aParentMolecule.getBuilder();
+            if (Objects.isNull(tmpBuilder)) {
+                throw new CDKException("Builder of the given atom container is 'null'.");
+            }
+            CDKHydrogenAdder tmpHAdder = CDKHydrogenAdder.getInstance(tmpBuilder);
+            CDKAtomTypeMatcher tmpMatcher = CDKAtomTypeMatcher.getInstance(tmpBuilder);
+            //Can throw CDKException
+            IAtomType tmpMatchedType = tmpMatcher.findMatchingAtomType(aParentMolecule, tmpAtom);
+            if (Objects.isNull(tmpMatchedType)) {
+                throw new CDKException("Matched atom type is 'null'.");
+            }
+            AtomTypeManipulator.configure(tmpAtom, tmpMatchedType);
+            //Can throw CDKException
+            tmpHAdder.addImplicitHydrogens(aParentMolecule, tmpAtom);
+        }
+        return tmpAtom;
+    }
+    //</editor-fold>
+    //</editor-fold>
 }
