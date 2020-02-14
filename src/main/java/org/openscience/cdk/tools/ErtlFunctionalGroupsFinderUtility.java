@@ -22,12 +22,15 @@ package org.openscience.cdk.tools;
 
 /**
  * TODO:
- * - Implement test class for hash generator settings ands preprocessing?
- * - add pseudo smiles generation method
+ * - Implement test class for hash generator settings ands preprocessing and copy method?
+ * - Add check for valid atomic number in every method(?)
+ * - add note in docs that given params will be changed and copy() should be used if that is not desired (also note that
+ * the exact same objects are returned)
  * - add method for FG frequency calculation requiring an iterator?
  * - Add logging methods using the class logger? Log molecule info alongside already logged exceptions?
  */
 
+import org.openscience.cdk.Atom;
 import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
 import org.openscience.cdk.exception.CDKException;
@@ -37,15 +40,18 @@ import org.openscience.cdk.hash.BasicAtomEncoder;
 import org.openscience.cdk.hash.HashGeneratorMaker;
 import org.openscience.cdk.hash.MoleculeHashGenerator;
 import org.openscience.cdk.interfaces.*;
+import org.openscience.cdk.io.SDFWriter;
+import org.openscience.cdk.io.iterator.IteratingSDFReader;
+import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.smiles.SmiFlavor;
 import org.openscience.cdk.smiles.SmilesGenerator;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Objects;
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -151,6 +157,7 @@ public final class ErtlFunctionalGroupsFinderUtility {
         ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("Se", "Sc");
         ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("P", "Pm");
         ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("R", "Es");
+
         ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Es",
                 ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_R_ATOM);
         ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Pm",
@@ -528,6 +535,119 @@ public final class ErtlFunctionalGroupsFinderUtility {
             return null;
         }
         return tmpMolecule;
+    }
+    //</editor-fold>
+    //
+    //<editor-fold desc="Other">
+    /**
+     * Aims at doing a deep copy of the given atom container, i.e. all information stored in the object is copied exactly
+     * but original and copy do not share any references. The method used here writes an SD representation (via CDK's
+     * SDFWriter) of the given atom container as a string and then constructs a new atom container by reading this string
+     * using IteratingSDFReader. Furthermore, all properties that were stored in the original atom container are transferred
+     * to the clone.
+     * <p>
+     *     RESTRICTIONS:
+     *     - All chemical information that an SDF can represent is copied but not all 'object information', e.g. the new
+     *       IAtomContainer object and its internal objects like IAtom or IBond objects will have different hash codes
+     *       because these are calculated based on their memory address.
+     *     - Properties stored on internal objects like IAtom or IBond objects will not be copied
+     *     - Because the atom container's properties are simply transferred, copy and original will still share references
+     *       to objects used as description or property
+     *     - In the instantiation of the new IAtomContainer object things like unsaturated bonds might be lost
+     * </p>
+     *
+     * @param aMolecule the atom container to copy
+     * @return a deep copy of the given atom container (see restrictions)
+     * @throws NullPointerException if the given atom container is 'null'
+     * @throws CDKException if the SDFWriter cannot write the given atom container
+     */
+    public static IAtomContainer copy(IAtomContainer aMolecule) throws NullPointerException, CDKException {
+        Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
+        StringWriter tmpStringWriter = new StringWriter();
+        SDFWriter tmpSDFWriter = new SDFWriter(tmpStringWriter);
+        boolean tmpAcceptsClass = tmpSDFWriter.accepts(aMolecule.getClass());
+        if (!tmpAcceptsClass) {
+            throw new CDKException("Given IChemObject/IAtomContainer implementing class can not be copied");
+        }
+        //Might throw CDKException
+        tmpSDFWriter.write(aMolecule);
+        tmpStringWriter.flush();
+        try {
+            tmpStringWriter.close();
+            tmpSDFWriter.close();
+        } catch (IOException anIOException) {
+            //Should not happen because nothing is written to file
+            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE, anIOException.toString(), anIOException);
+        }
+        String tmpSDFRepresentation = tmpStringWriter.toString();
+        StringReader tmpStringReader = new StringReader(tmpSDFRepresentation);
+        IteratingSDFReader tmpSDFReader = new IteratingSDFReader(tmpStringReader, aMolecule.getBuilder(), true);
+        IAtomContainer tmpCopy = tmpSDFReader.next();
+        //SD representation should contain string-type properties; so for the non-string-type properties, the following is done:
+        Map<Object, Object> tmpProperties = aMolecule.getProperties();
+        for (Object tmpKey : tmpProperties.keySet()) {
+            boolean tmpCloneHasProperty = !Objects.isNull(tmpCopy.getProperty(tmpKey));
+            if (!tmpCloneHasProperty) {
+                tmpCopy.setProperty(tmpKey, tmpProperties.get(tmpKey));
+            }
+        }
+        return tmpCopy;
+    }
+
+    /**
+     * TODO: Add doc
+     */
+    public static String getPseudoSmilesCode(IAtomContainer aMolecule) throws NullPointerException, CDKException {
+        Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
+        IAtomContainer tmpMolecule = aMolecule;
+        Iterable<IAtom> tmpAtoms = tmpMolecule.atoms();
+        HashMap<IAtom, IAtom> tmpMapForResubstitution = new HashMap(20, 0.8f);
+        for (IAtom tmpAtom: tmpAtoms) {
+            boolean tmpIsAromatic = tmpAtom.isAromatic();
+            boolean tmpIsPseudoAtom = (tmpAtom instanceof IPseudoAtom && "R".equals(((IPseudoAtom)tmpAtom).getLabel()));
+            if (tmpIsAromatic && !tmpIsPseudoAtom) {
+                String tmpSymbol = tmpAtom.getSymbol();
+                if (Objects.isNull(tmpSymbol)) {
+                    continue;
+                }
+                boolean tmpContainsKey = ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.containsKey(tmpSymbol);
+                if (tmpContainsKey) {
+                    String tmpReplacementElementSymbol = ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.get(tmpSymbol);
+                    IAtom tmpReplacementAtom = new Atom(tmpReplacementElementSymbol);
+                    Integer tmpImplicitHydrogenCount = tmpAtom.getImplicitHydrogenCount();
+                    //TODO: Get returned boolean and throw exception if replacement could not be made?
+                    AtomContainerManipulator.replaceAtomByAtom(tmpMolecule, tmpAtom, tmpReplacementAtom);
+                    tmpReplacementAtom.setImplicitHydrogenCount(tmpImplicitHydrogenCount == null ? 0 : tmpImplicitHydrogenCount);
+                    tmpMapForResubstitution.put(tmpReplacementAtom, tmpAtom);
+                }
+            }
+            if (tmpIsPseudoAtom) {
+                String tmpReplacementElementSymbol = ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.get("R");
+                IAtom tmpReplacementAtom = new Atom(tmpReplacementElementSymbol);
+                Integer tmpImplicitHydrogenCount = tmpAtom.getImplicitHydrogenCount();
+                //TODO: Get returned boolean and throw exception if replacement could not be made?
+                AtomContainerManipulator.replaceAtomByAtom(tmpMolecule, tmpAtom, tmpReplacementAtom);
+                tmpReplacementAtom.setImplicitHydrogenCount(tmpImplicitHydrogenCount == null ? 0 : tmpImplicitHydrogenCount);
+                tmpMapForResubstitution.put(tmpReplacementAtom, tmpAtom);
+            }
+        }
+        //Might throw CDKException
+        String tmpPseudoSmilesCode = ErtlFunctionalGroupsFinderUtility.SMILES_GENERATOR.create(tmpMolecule);
+        for (String tmpPlaceholderElementSymbol : ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.keySet()) {
+            tmpPseudoSmilesCode = tmpPseudoSmilesCode.replaceAll("(\\[" + tmpPlaceholderElementSymbol + "\\])",
+                    ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.get(tmpPlaceholderElementSymbol))
+                    .replaceAll("(" + tmpPlaceholderElementSymbol + ")",
+                            ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.get(tmpPlaceholderElementSymbol));
+        }
+        for (IAtom tmpReplacementAtom: tmpMapForResubstitution.keySet()) {
+            //TODO: Get returned boolean and throw exception if replacement could not be made?
+            IAtom tmpOriginalAtom = tmpMapForResubstitution.get(tmpReplacementAtom);
+            Integer tmpImplicitHydrogenCount = tmpReplacementAtom.getImplicitHydrogenCount();
+            AtomContainerManipulator.replaceAtomByAtom(tmpMolecule, tmpReplacementAtom, tmpOriginalAtom);
+            tmpOriginalAtom.setImplicitHydrogenCount(tmpImplicitHydrogenCount == null ? 0 : tmpImplicitHydrogenCount);
+            tmpMapForResubstitution.remove(tmpReplacementAtom, tmpOriginalAtom);
+        }
+        return tmpPseudoSmilesCode;
     }
     //</editor-fold>
     //</editor-fold>
