@@ -22,23 +22,20 @@ package org.openscience.cdk.tools;
 
 /**
  * TODO:
- * - Change licence in git
- * - Implement test class for hash generator settings ands preprocessing and copy method? And other functionalities
- * - Add check for valid atomic number in every method(?), at least in pseudo SMILES method it's necessary!
- * - add note in docs that given params will be changed and copy() should be used if that is not desired (also note that
+ * - Add check for valid atomic number in every method(?), at least in legacy pseudo SMILES method it's necessary!
+ * - add note in docs that given params will be changed ('This method overwrites existing values.') and copy() should be used if that is not desired (also note that
  * the exact same objects are returned)
  * - review docs
  * - add method for FG frequency calculation requiring an iterator?
  * - Add logging methods using the class logger? Log molecule info alongside already logged exceptions?
  * - Implement non-static methods and set up logging files in this constructor? Or static initializer? Discard constructor?
- * - add preprocessing methods for perceiving atom types and applying aromaticity?
- * - Better way for pseudo SMILES generation? See also todos there
  */
 
 import org.openscience.cdk.Atom;
 import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
 import org.openscience.cdk.exception.CDKException;
+import org.openscience.cdk.exception.Intractable;
 import org.openscience.cdk.graph.ConnectivityChecker;
 import org.openscience.cdk.hash.AtomEncoder;
 import org.openscience.cdk.hash.BasicAtomEncoder;
@@ -78,7 +75,6 @@ import java.util.logging.Logger;
  */
 public final class ErtlFunctionalGroupsFinderUtility {
     //<editor-fold desc="Private static final class constants">
-    //<editor-fold desc="General">
     /**
      * Atomic numbers that ErtlFunctionalGroupsFinder accepts, see getValidAtomicNumbers()
      */
@@ -96,66 +92,6 @@ public final class ErtlFunctionalGroupsFinderUtility {
     private static final Logger LOGGER = Logger.getLogger(ErtlFunctionalGroupsFinderUtility.class.getName());
     //</editor-fold>
     //
-    //<editor-fold defaultstate="collapsed" desc="Pseudo SMILES code">
-    /**
-     * Type of the generated SMILES codes
-     */
-    private static final int SMILES_GENERATOR_OUTPUT_MODE = SmiFlavor.Unique;
-
-    /**
-     * SmilesGenerator for generating SMILES and pseudo SMILES representations
-     */
-    private static final SmilesGenerator SMILES_GENERATOR = new SmilesGenerator(ErtlFunctionalGroupsFinderUtility.SMILES_GENERATOR_OUTPUT_MODE);
-
-    /**
-     * A map that gives a certain element symbol for a placeholder atom marking a specific aromatic atom in pseudo SMILES
-     * creation
-     */
-    private static final HashMap<String, String> PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP = new HashMap<>(10, 1);
-
-    /**
-     * A map that gives the pseudo SMILES representation for a specific placeholder element from
-     * pseudoSmilesAromaticElementToPlaceholderElementMap
-     */
-    private static final HashMap<String, String> PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP = new HashMap<>(10, 1);
-
-    /**
-     * Pseudo SMILES representation of an aromatic C atom
-     */
-    private static final String PSEUDO_SMILES_AROMATIC_CARBON = "C*";
-
-    /**
-     * Pseudo SMILES representation of an aromatic N atom
-     */
-    private static final String PSEUDO_SMILES_AROMATIC_NITROGEN = "N*";
-
-    /**
-     * Pseudo SMILES representation of an aromatic S atom
-     */
-    private static final String PSEUDO_SMILES_AROMATIC_SULPHUR = "S*";
-
-    /**
-     * Pseudo SMILES representation of an aromatic O atom
-     */
-    private static final String PSEUDO_SMILES_AROMATIC_OXYGEN = "O*";
-
-    /**
-     * Pseudo SMILES representation of an aromatic Se atom
-     */
-    private static final String PSEUDO_SMILES_AROMATIC_SELENIUM = "Se*";
-
-    /**
-     * Pseudo SMILES representation of an aromatic P atom
-     */
-    private static final String PSEUDO_SMILES_AROMATIC_PHOSPHOR = "P*";
-
-    /**
-     * Pseudo SMILES representation of an undefined pseudo atom
-     */
-    private static final String PSEUDO_SMILES_R_ATOM = "R";
-    //</editor-fold>
-    //</editor-fold>
-    //
     //<editor-fold desc="Static initializer">
     /**
      * Static initializer that sets up hash maps/sets used by static methods.
@@ -164,28 +100,6 @@ public final class ErtlFunctionalGroupsFinderUtility {
         for (int i : ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS) {
             ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS_SET.add(i);
         }
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("C", "Ce");
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("N", "Nd");
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("S", "Sm");
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("O", "Os");
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("Se", "Sc");
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("P", "Pm");
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.put("R", "Es");
-
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Es",
-                ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_R_ATOM);
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Pm",
-                ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_PHOSPHOR);
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Sc",
-                ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_SELENIUM);
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Os",
-                ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_OXYGEN);
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Sm",
-                ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_SULPHUR);
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Nd",
-                ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_NITROGEN);
-        ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.put("Ce",
-                ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_CARBON);
     }
     //</editor-fold>
     //
@@ -490,9 +404,9 @@ public final class ErtlFunctionalGroupsFinderUtility {
     /**
      * Neutralizes charged atoms in the given atom container by zeroing the formal atomic charges and filling up free
      * valences with implicit hydrogen atoms (according to the CDK atom types). This procedure allows a more general
-     * charge treatment than a pre-defined transformation list but may produce “wrong” structures, e.g. it turns a
-     * nitro NO2 group into a structure represented by the SMILES code “[H]O[N](=O)*” with an uncharged four-bonded
-     * nitrogen atom (other examples are “*[N](*)(*)*”, “[C]#[N]*” or “*S(*)(*)*”). Thus an improved charge
+     * charge treatment than a pre-defined transformation list but may produce "wrong" structures, e.g. it turns a
+     * nitro NO2 group into a structure represented by the SMILES code "[H]O[N](=O)*" with an uncharged four-bonded
+     * nitrogen atom (other examples are "*[N](*)(*)*", "[C]#[N]*" or "*S(*)(*)*"). Thus an improved charge
      * neutralization scheme is desirable for future implementations. <br>
      *     Iterates through all atoms in the given atom container, so the method scales linearly with
      *     O(n) with n: number of atoms.
@@ -558,6 +472,65 @@ public final class ErtlFunctionalGroupsFinderUtility {
     }
 
     /**
+     * Convenience method to perceive atom types for all IAtoms in the IAtomContainer, using the
+     * CDK AtomContainerManipulator or rather the CDKAtomTypeMatcher. If the matcher finds a matching atom type, the
+     * IAtom will be configured to have the same properties as the IAtomType. If no matching atom type is found, no
+     * configuration is performed.
+     * <br>Calling this method is equal to calling AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(aMolecule).
+     * It has been given its own method here because it is a necessary step in the preprocessing for
+     * ErtlFunctionalGroupsFinder.
+     *
+     * @param aMolecule the molecule to configure
+     * @return the same molecule with configured atom types
+     * @throws NullPointerException is aMolecule is 'null'
+     * @throws CDKException when something went wrong with going through the AtomType options
+     * @see AtomContainerManipulator#percieveAtomTypesAndConfigureAtoms(IAtomContainer)
+     * @see CDKAtomTypeMatcher#findMatchingAtomType(IAtomContainer, IAtom)
+     */
+    public static IAtomContainer perceiveAtomTypesAndConfigureAtoms(IAtomContainer aMolecule) throws NullPointerException, CDKException {
+        Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
+        IAtomContainer tmpMolecule = aMolecule;
+        //Might throw CDKException but it is unclear in what case
+        AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(tmpMolecule);
+        return tmpMolecule;
+    }
+
+    /**
+     * Convenience method for applying the given aromaticity model to the given molecule. Any existing aromaticity flags
+     * are removed - even if no aromatic bonds were found. This follows the idea of applying an aromaticity model to a
+     * molecule such that the result is the same irrespective of existing aromatic flags.
+     * <br>Calling this method is equal to calling Aromaticity.apply(aMolecule) (returns boolean).
+     * It has been given its own method here because it is a necessary step in the preprocessing for
+     * ErtlFunctionalGroupsFinder.
+     *
+     * @param aMolecule the molecule to apply the model to
+     * @param anAromaticityModel the model to apply; Note that the choice of electron donation model and cycle finder
+     *                           algorithm has a heavy influence on the functional group detection of
+     *                           ErtlFunctionalGroupsFinder
+     * @return the same molecule with possibly set aromaticity flags
+     * @throws NullPointerException if a parameter is 'null'
+     * @throws CDKException if a problem occurred with the cycle perception (see CDK docs)
+     * @see Aromaticity#apply(IAtomContainer)
+     */
+    public static IAtomContainer applyAromaticityDetection(IAtomContainer aMolecule, Aromaticity anAromaticityModel) throws NullPointerException, CDKException {
+        Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
+        Objects.requireNonNull(anAromaticityModel, "Given aromaticity model is 'null'.");
+        IAtomContainer tmpMolecule = aMolecule;
+        Aromaticity tmpModel = anAromaticityModel;
+        try {
+            //throws CDKException if a problem occurred with the cycle perception (see CDK docs)
+            //Note: Contrary to the docs, an Intractable exception might be thrown
+            anAromaticityModel.apply(aMolecule);
+        } catch (Intractable anIntractableException) {
+            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE, anIntractableException.toString(), anIntractableException);
+            String tmpMessage = anIntractableException.getMessage();
+            Throwable tmpCause = anIntractableException.getCause();
+            throw new CDKException(tmpMessage, tmpCause);
+        }
+        return tmpMolecule;
+    }
+
+    /**
      * Checks whether the given molecule represented by an atom container should be discarded instead of being passed
      * on to the ErtlFunctionalGroupsFinder's find() method. If that is not the case, this method applies preprocessing
      * to the given atom container that is always needed (setting atom types and applying an aromaticity model) and
@@ -573,14 +546,14 @@ public final class ErtlFunctionalGroupsFinderUtility {
      * ElectronDonation model can massively influence the extracted function groups of a molecule when using
      * ErtlFunctionGroupsFinder!
      * @return the preprocessed atom container or 'null' if the molecule should be discarded
-     * @throws NullPointerException if a parameter is 'null'
+     * @throws NullPointerException if a parameter is 'null'; Note: All other exceptions are caught and logged
      */
     public static IAtomContainer applyFiltersAndPreprocessing(IAtomContainer aMolecule, Aromaticity anAromaticityModel) throws NullPointerException {
         Objects.requireNonNull(aMolecule, "Given atom container is 'null'.");
         Objects.requireNonNull(anAromaticityModel, "Given aromaticity model is 'null'.");
         IAtomContainer tmpMolecule = aMolecule;
         try {
-            AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(tmpMolecule);
+            ErtlFunctionalGroupsFinderUtility.perceiveAtomTypesAndConfigureAtoms(tmpMolecule);
             //Filter
             boolean tmpIsAtomOrBondCountZero = ErtlFunctionalGroupsFinderUtility.isAtomOrBondCountZero(tmpMolecule);
             if (tmpIsAtomOrBondCountZero) {
@@ -602,7 +575,7 @@ public final class ErtlFunctionalGroupsFinderUtility {
                 tmpMolecule = ErtlFunctionalGroupsFinderUtility.neutralizeCharges(tmpMolecule);
             }
             //Application of aromaticity model
-            anAromaticityModel.apply(tmpMolecule);
+            ErtlFunctionalGroupsFinderUtility.applyAromaticityDetection(tmpMolecule, anAromaticityModel);
         } catch (Exception anException) {
             ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE, anException.toString(), anException);
             return null;
@@ -670,9 +643,6 @@ public final class ErtlFunctionalGroupsFinderUtility {
     /**
      * Gives the pseudo SMILES code for a given molecule / functional group. In this notation, aromatic atoms are marked
      * by asterisks (*) and pseudo atoms are indicated by 'R'.
-     * <br>Note: Aromatic atoms in the given atom container are substituted by placeholder atoms (of very rare occurrence),
-     * then the SMILES string is generated and turned into a pseudo SMILES code. Finally, the placeholder atoms are
-     * resubstituted with the original atoms. This workaround is necessary to preserve the aromaticity information.
      *
      * @param aMolecule the molecule whose pseudo SMILES code to generate
      * @return the pseudo SMILES representation as a string
@@ -682,8 +652,119 @@ public final class ErtlFunctionalGroupsFinderUtility {
     public static String getPseudoSmilesCode(IAtomContainer aMolecule) throws NullPointerException, CDKException {
         Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
         IAtomContainer tmpMolecule = aMolecule;
+        SmilesGenerator tmpSmilesGenerator = new SmilesGenerator(SmiFlavor.Unique | SmiFlavor.UseAromaticSymbols);
+        //Might throw CDKException if the SMILES string cannot be created
+        String tmpPseudoSmilesCode = tmpSmilesGenerator.create(tmpMolecule);
+        tmpPseudoSmilesCode = tmpPseudoSmilesCode.replaceAll("\\*", "R");
+        tmpPseudoSmilesCode = tmpPseudoSmilesCode.replaceAll("\\[se", "[Se*");
+        StringBuilder tmpStringBuilder = new StringBuilder(tmpPseudoSmilesCode);
+        int tmpLength = tmpStringBuilder.length();
+        for (int tmpIndex = 0; tmpIndex < tmpLength; tmpIndex++) {
+            char tmpChar = tmpStringBuilder.charAt(tmpIndex);
+            char tmpPrevChar = '_';
+            char tmpPrevPrevChar = '_';
+            if (tmpIndex > 0) {
+                tmpPrevChar = tmpStringBuilder.charAt(tmpIndex - 1);
+            }
+            if (tmpIndex > 1) {
+                tmpPrevPrevChar = tmpStringBuilder.charAt(tmpIndex - 2);
+            }
+            switch (tmpChar) {
+                case 'c':
+                    //c in [Sc], [Tc], and [Ac] should not be replaced
+                    if ((tmpPrevChar == 'S' || tmpPrevChar == 'T' || tmpPrevChar == 'A') && tmpPrevPrevChar == '[') {
+                        break;
+                    } else {
+                        tmpStringBuilder.setCharAt(tmpIndex, 'C');
+                        tmpStringBuilder.insert(tmpIndex + 1, '*');
+                    }
+                    break;
+                case 'n':
+                    //n in [Mn], [Zn], [Cn], [In], [Sn], and [Rn] should not be replaced
+                    if ((tmpPrevChar == 'M' || tmpPrevChar == 'Z' || tmpPrevChar == 'C' || tmpPrevChar == 'I' || tmpPrevChar == 'S' || tmpPrevChar == 'R') && tmpPrevPrevChar == '[') {
+                        break;
+                    } else {
+                        tmpStringBuilder.setCharAt(tmpIndex, 'N');
+                        tmpStringBuilder.insert(tmpIndex + 1, '*');
+                    }
+                    break;
+                case 's':
+                    //s in [Cs], [Os], [As], [Es], [Hs], and [Uus] should not be replaced
+                    if ((tmpPrevChar == 'C' || tmpPrevChar == 'O' || tmpPrevChar == 'A' || tmpPrevChar == 'E' || tmpPrevChar == 'H') && tmpPrevPrevChar == '[') {
+                        break;
+                    } else if (tmpPrevChar == 'u' && tmpPrevPrevChar == 'U') {
+                        break;
+                    } else {
+                        tmpStringBuilder.setCharAt(tmpIndex, 'S');
+                        tmpStringBuilder.insert(tmpIndex + 1, '*');
+                    }
+                    break;
+                case 'o':
+                    //o in [Mo], [Co], [Po], [Uuo], [Ho], and [No] should not be replaced
+                    if ((tmpPrevChar == 'M' || tmpPrevChar == 'C' || tmpPrevChar == 'P' || tmpPrevChar == 'H' || tmpPrevChar == 'N') && tmpPrevPrevChar == '[') {
+                        break;
+                    } else if (tmpPrevChar == 'u' && tmpPrevPrevChar == 'U') {
+                        break;
+                    } else {
+                        tmpStringBuilder.setCharAt(tmpIndex, 'O');
+                        tmpStringBuilder.insert(tmpIndex + 1, '*');
+                    }
+                    break;
+                case 'p':
+                    //p in [Uup] and [Np] should not be replaced
+                    if (tmpPrevChar == 'N' && tmpPrevPrevChar == '[') {
+                        break;
+                    } else if (tmpPrevChar == 'u' && tmpPrevPrevChar == 'U') {
+                        break;
+                    } else {
+                        tmpStringBuilder.setCharAt(tmpIndex, 'P');
+                        tmpStringBuilder.insert(tmpIndex + 1, '*');
+                    }
+                    break;
+                default:
+                    break;
+            }
+            tmpLength = tmpStringBuilder.length();
+        }
+        tmpPseudoSmilesCode = tmpStringBuilder.toString();
+        return tmpPseudoSmilesCode;
+    }
+
+    /**
+     * DEPRACTED: Use getPseudoSmilesCode(aMolecule) instead
+     * <br>Gives the pseudo SMILES code for a given molecule / functional group. In this notation, aromatic atoms are marked
+     * by asterisks (*) and pseudo atoms are indicated by 'R'.
+     * <br>Note: Aromatic atoms in the given atom container are substituted by placeholder atoms (of very rare occurrence),
+     * then the SMILES string is generated and turned into a pseudo SMILES code. Finally, the placeholder atoms are
+     * resubstituted with the original atoms. This workaround is necessary to preserve the aromaticity information.
+     *
+     * @param aMolecule the molecule whose pseudo SMILES code to generate
+     * @return the pseudo SMILES representation as a string
+     * @throws NullPointerException if aMolecule is 'null'
+     * @throws CDKException if the SMILES code of aMolecule cannot be generated
+     */
+    @Deprecated
+    public static String getLegacyPseudoSmilesCode(IAtomContainer aMolecule) throws NullPointerException, CDKException {
+        Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
+        IAtomContainer tmpMolecule = aMolecule;
         Iterable<IAtom> tmpAtoms = tmpMolecule.atoms();
         HashMap<IAtom, IAtom> tmpMapForResubstitution = new HashMap(20, 0.8f);
+        HashMap<String, String> aromaticElementToPlaceholderElementMap = new HashMap<>(10, 1);
+        aromaticElementToPlaceholderElementMap.put("C", "Ce");
+        aromaticElementToPlaceholderElementMap.put("N", "Nd");
+        aromaticElementToPlaceholderElementMap.put("S", "Sm");
+        aromaticElementToPlaceholderElementMap.put("O", "Os");
+        aromaticElementToPlaceholderElementMap.put("Se", "Sc");
+        aromaticElementToPlaceholderElementMap.put("P", "Pm");
+        aromaticElementToPlaceholderElementMap.put("R", "Es");
+        HashMap<String, String> placeholderElementToPseudoSmilesSymbolMap = new HashMap<>(10, 1);
+        placeholderElementToPseudoSmilesSymbolMap.put("Es", "R");
+        placeholderElementToPseudoSmilesSymbolMap.put("Pm", "P*");
+        placeholderElementToPseudoSmilesSymbolMap.put("Sc", "Se*");
+        placeholderElementToPseudoSmilesSymbolMap.put("Os", "O*");
+        placeholderElementToPseudoSmilesSymbolMap.put("Sm", "S*");
+        placeholderElementToPseudoSmilesSymbolMap.put("Nd", "N*");
+        placeholderElementToPseudoSmilesSymbolMap.put("Ce", "C*");
         for (IAtom tmpAtom: tmpAtoms) {
             boolean tmpIsAromatic = tmpAtom.isAromatic();
             boolean tmpIsPseudoAtom = (tmpAtom instanceof IPseudoAtom && "R".equals(((IPseudoAtom)tmpAtom).getLabel()));
@@ -692,37 +773,36 @@ public final class ErtlFunctionalGroupsFinderUtility {
                 if (Objects.isNull(tmpSymbol)) {
                     continue;
                 }
-                boolean tmpContainsKey = ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.containsKey(tmpSymbol);
+                boolean tmpContainsKey = aromaticElementToPlaceholderElementMap.containsKey(tmpSymbol);
                 if (tmpContainsKey) {
-                    String tmpReplacementElementSymbol = ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.get(tmpSymbol);
+                    String tmpReplacementElementSymbol = aromaticElementToPlaceholderElementMap.get(tmpSymbol);
                     IAtom tmpReplacementAtom = new Atom(tmpReplacementElementSymbol);
                     Integer tmpImplicitHydrogenCount = tmpAtom.getImplicitHydrogenCount();
-                    //TODO: Get returned boolean and throw exception if replacement could not be made?
+                    //TODO: Get returned boolean and throw exception if replacement could not be made? See also replacements below
                     AtomContainerManipulator.replaceAtomByAtom(tmpMolecule, tmpAtom, tmpReplacementAtom);
                     tmpReplacementAtom.setImplicitHydrogenCount(tmpImplicitHydrogenCount == null ? 0 : tmpImplicitHydrogenCount);
                     tmpMapForResubstitution.put(tmpReplacementAtom, tmpAtom);
                 }
             }
             if (tmpIsPseudoAtom) {
-                String tmpReplacementElementSymbol = ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_AROMATIC_ELEMENT_TO_PLACEHOLDER_ELEMENT_MAP.get("R");
+                String tmpReplacementElementSymbol = aromaticElementToPlaceholderElementMap.get("R");
                 IAtom tmpReplacementAtom = new Atom(tmpReplacementElementSymbol);
                 Integer tmpImplicitHydrogenCount = tmpAtom.getImplicitHydrogenCount();
-                //TODO: Get returned boolean and throw exception if replacement could not be made?
                 AtomContainerManipulator.replaceAtomByAtom(tmpMolecule, tmpAtom, tmpReplacementAtom);
                 tmpReplacementAtom.setImplicitHydrogenCount(tmpImplicitHydrogenCount == null ? 0 : tmpImplicitHydrogenCount);
                 tmpMapForResubstitution.put(tmpReplacementAtom, tmpAtom);
             }
         }
+        SmilesGenerator tmpSmilesGenerator = new SmilesGenerator(SmiFlavor.Unique);
         //Might throw CDKException
-        String tmpPseudoSmilesCode = ErtlFunctionalGroupsFinderUtility.SMILES_GENERATOR.create(tmpMolecule);
-        for (String tmpPlaceholderElementSymbol : ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.keySet()) {
+        String tmpPseudoSmilesCode = tmpSmilesGenerator.create(tmpMolecule);
+        for (String tmpPlaceholderElementSymbol : placeholderElementToPseudoSmilesSymbolMap.keySet()) {
             tmpPseudoSmilesCode = tmpPseudoSmilesCode.replaceAll("(\\[" + tmpPlaceholderElementSymbol + "\\])",
-                    ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.get(tmpPlaceholderElementSymbol))
+                    placeholderElementToPseudoSmilesSymbolMap.get(tmpPlaceholderElementSymbol))
                     .replaceAll("(" + tmpPlaceholderElementSymbol + ")",
-                            ErtlFunctionalGroupsFinderUtility.PSEUDO_SMILES_PLACEHOLDER_ELEMENT_TO_PSEUDO_SMILES_SYMBOL_MAP.get(tmpPlaceholderElementSymbol));
+                            placeholderElementToPseudoSmilesSymbolMap.get(tmpPlaceholderElementSymbol));
         }
         for (IAtom tmpReplacementAtom: tmpMapForResubstitution.keySet()) {
-            //TODO: Get returned boolean and throw exception if replacement could not be made?
             IAtom tmpOriginalAtom = tmpMapForResubstitution.get(tmpReplacementAtom);
             Integer tmpImplicitHydrogenCount = tmpReplacementAtom.getImplicitHydrogenCount();
             AtomContainerManipulator.replaceAtomByAtom(tmpMolecule, tmpReplacementAtom, tmpOriginalAtom);

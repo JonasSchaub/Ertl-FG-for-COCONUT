@@ -22,6 +22,7 @@ package org.openscience.cdk.tools;
 
 import org.junit.Assert;
 import org.junit.Assume;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.openscience.cdk.Atom;
 import org.openscience.cdk.CDKConstants;
@@ -474,6 +475,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      *
      * @throws Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
      */
+    @Ignore
     @Test
     public void testElectronDonationDependency() throws Exception {
         this.analyzeElectronDonationDependency(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH,
@@ -490,6 +492,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      *
      * @throws Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
      */
+    @Ignore
     @Test
     public void testElectronDonationDependencyNoMultiples() throws Exception {
         this.analyzeElectronDonationDependency(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH,
@@ -505,6 +508,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      *
      * @throws Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
      */
+    @Ignore
     @Test
     public void testCycleFinderDependency() throws Exception {
         this.initializeWithFileOperations(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH,
@@ -558,6 +562,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      * @throws Exception if initializeWithFileOperations() throws an exception or the IteratingSDFReader
      * can not be closed or an unexpectedException occurs
      */
+    @Ignore
     @Test
     public void testPerformance() throws Exception {
         this.initialize(true, "PerformanceTest");
