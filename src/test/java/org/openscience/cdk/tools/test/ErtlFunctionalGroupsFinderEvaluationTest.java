@@ -1,9 +1,9 @@
 /**
  * Evaluation tests for
  * ErtlFunctionalGroupsFinder for CDK
- * Copyright (C) 2019 Jonas Schaub
+ * Copyright (C) 2020 Jonas Schaub
  * 
- * Source code is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
+ * The original source code is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -18,11 +18,30 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.openscience.cdk.tools;
+package org.openscience.cdk.tools.test;
 
+/**
+ * TODO:
+ * - Add output of mw, see changes made in CoconutCuration project
+ */
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 import org.junit.Assert;
 import org.junit.Assume;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.openscience.cdk.Atom;
 import org.openscience.cdk.CDKConstants;
@@ -38,7 +57,12 @@ import org.openscience.cdk.hash.AtomEncoder;
 import org.openscience.cdk.hash.BasicAtomEncoder;
 import org.openscience.cdk.hash.HashGeneratorMaker;
 import org.openscience.cdk.hash.MoleculeHashGenerator;
-import org.openscience.cdk.interfaces.*;
+import org.openscience.cdk.interfaces.IAtom;
+import org.openscience.cdk.interfaces.IAtomContainer;
+import org.openscience.cdk.interfaces.IAtomContainerSet;
+import org.openscience.cdk.interfaces.IAtomType;
+import org.openscience.cdk.interfaces.IBond;
+import org.openscience.cdk.interfaces.IPseudoAtom;
 import org.openscience.cdk.io.iterator.IteratingSDFReader;
 import org.openscience.cdk.smiles.SmiFlavor;
 import org.openscience.cdk.smiles.SmilesGenerator;
@@ -46,13 +70,9 @@ import org.openscience.cdk.smiles.SmilesParser;
 import org.openscience.cdk.tools.ErtlFunctionalGroupsFinder.Mode;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
+import org.openscience.cdk.tools.ErtlFunctionalGroupsFinder;
+import org.openscience.cdk.tools.CDKHydrogenAdder;
 
-import java.io.*;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-
-//Has been adapted to analyze COCONUT
 
 /**
  * This test class can be used to read an SD file containing chemical structures, to extract their functional groups using
@@ -77,7 +97,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
     /**
      * Path to SD file that should be analyzed
      */
-    private static final String SD_FILE_PATH = "D:\\Project_COCONUT_Curation\\CoconutCurationOutput\\COCONUTnovember7_withSugars.sdf";
+    private static final String SD_FILE_PATH = "ChEBI_lite_3star_subset.sdf";
     
     /**
      * Directory for output files; Will be created as sub-folder in the working directory (the directory of the read SD file)
@@ -216,12 +236,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      * molecule that contains this functional group
      */
     private static final String MOLECULE_OF_ORIGIN_KEY = "origin";
-
-    /**
-     * Key for the output file's header under which to store the molecular weight of the functional group
-     */
-    private static final String MOLECULAR_WEIGHT_KEY = "mw";
-
+    
     /**
      * Separator for the output file's values
      */
@@ -473,50 +488,48 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      * <p>
      * (Functional groups occurring multiple times in the same molecule are counted multiple times)
      *
-     * @throws Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
+     * @throws java.lang.Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
      */
-    @Ignore
     @Test
     public void testElectronDonationDependency() throws Exception {
-        this.analyzeElectronDonationDependency(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH,
-                ErtlFunctionalGroupsFinderEvaluationTest.ELECTRON_DONATION_TEST_IDENTIFIER,
+        this.analyzeElectronDonationDependency(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH, 
+                ErtlFunctionalGroupsFinderEvaluationTest.ELECTRON_DONATION_TEST_IDENTIFIER, 
                 true);
     }
-
+    
     /**
-     * Test for analyzing molecules in an SD file for all four different electron donation models supplied by the cdk:
+     * Test for analyzing molecules in an SD file for all four different electron donation models supplied by the cdk: 
      * daylight, cdk, piBonds, cdkAllowingExocyclic and the aromaticity model cdkLegacy.
      * <p>
      * Difference to testElectronDonationDependency(): If the same functional group occurs multiple times in the same molecule
      * it is counted only once
      *
-     * @throws Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
+     * @throws java.lang.Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
      */
-    @Ignore
     @Test
     public void testElectronDonationDependencyNoMultiples() throws Exception {
-        this.analyzeElectronDonationDependency(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH,
-                ErtlFunctionalGroupsFinderEvaluationTest.ELECTRON_DONATION_NO_MULTIPLES_TEST_IDENTIFIER,
+        this.analyzeElectronDonationDependency(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH, 
+                ErtlFunctionalGroupsFinderEvaluationTest.ELECTRON_DONATION_NO_MULTIPLES_TEST_IDENTIFIER, 
                 false);
     }
-
+    
     /**
-     * Test for analyzing molecules in an SD file for six different CycleFinder settings supplied by the cdk: all(),
+     * Test for analyzing molecules in an SD file for six different CycleFinder settings supplied by the cdk: all(), 
      * vertexShort(), relevant(), essential(), tripleShort() and cdkAromaticSet().
      * <p>
      * (Functional groups occurring multiple times in the same molecule are counted multiple times)
      *
-     * @throws Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
+     * @throws java.lang.Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
      */
-    @Ignore
     @Test
     public void testCycleFinderDependency() throws Exception {
-        this.initializeWithFileOperations(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH,
+        this.initializeWithFileOperations(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH, 
                 ErtlFunctionalGroupsFinderEvaluationTest.CYCLE_FINDER_TEST_IDENTIFIER);
         Assume.assumeTrue(this.isTestAbleToRun);
-
+        
         System.out.println("\nLoading file with path: " + ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH);
-        File tmpSDFile = new File(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH);
+        ClassLoader tmpClassLoader = this.getClass().getClassLoader();
+        File tmpSDFile = new File(tmpClassLoader.getResource(ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH).getFile());
         int tmpRequiredNumberOfReaders = 6;
         IteratingSDFReader[] tmpReaders = new IteratingSDFReader[tmpRequiredNumberOfReaders];
         try {
@@ -530,23 +543,23 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
             Assume.assumeTrue(false);
             return;
         }
-
+        
         Aromaticity tmpDaylightModelAll = new Aromaticity(ElectronDonation.daylight(), Cycles.all());
         Aromaticity tmpDaylightModelVertexShort = new Aromaticity(ElectronDonation.daylight(), Cycles.vertexShort());
         Aromaticity tmpDaylightModelRelevant = new Aromaticity(ElectronDonation.daylight(), Cycles.relevant());
         Aromaticity tmpDaylightModelEssential = new Aromaticity(ElectronDonation.daylight(), Cycles.essential());
         Aromaticity tmpDaylightModelTripleShort = new Aromaticity(ElectronDonation.daylight(), Cycles.tripletShort());
         Aromaticity tmpDaylightModelCdkAromaticSet = new Aromaticity(ElectronDonation.daylight(), Cycles.cdkAromaticSet());
-
+        
         boolean tmpAreMultiplesCounted = false;
-
+        
         this.calculateAbsoluteFGFrequencies(tmpReaders[0], "all", tmpDaylightModelAll, tmpAreMultiplesCounted);
         this.calculateAbsoluteFGFrequencies(tmpReaders[1], "vertexShort", tmpDaylightModelVertexShort, tmpAreMultiplesCounted);
         this.calculateAbsoluteFGFrequencies(tmpReaders[2], "relevant", tmpDaylightModelRelevant, tmpAreMultiplesCounted);
         this.calculateAbsoluteFGFrequencies(tmpReaders[3], "essential", tmpDaylightModelEssential, tmpAreMultiplesCounted);
         this.calculateAbsoluteFGFrequencies(tmpReaders[4], "tripletShort", tmpDaylightModelTripleShort, tmpAreMultiplesCounted);
         this.calculateAbsoluteFGFrequencies(tmpReaders[5], "cdkAromaticSet", tmpDaylightModelCdkAromaticSet, tmpAreMultiplesCounted);
-
+        
         System.out.println("\nAll analyses are done!");
         for (IteratingSDFReader tmpReader : tmpReaders) {
             tmpReader.close();
@@ -555,21 +568,21 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
         System.out.println("\nFinished!");
         System.out.println("\nNumber of occured exceptions: " + this.exceptionsCounter);
     }
-
+    
     /**
      * Testing the ErtlFunctionalGroupsFinder.find() method's performance on the given SD file.
-     *
-     * @throws Exception if initializeWithFileOperations() throws an exception or the IteratingSDFReader
+     * 
+     * @throws java.lang.Exception if initializeWithFileOperations() throws an exception or the IteratingSDFReader 
      * can not be closed or an unexpectedException occurs
      */
-    @Ignore
     @Test
     public void testPerformance() throws Exception {
         this.initialize(true, "PerformanceTest");
         //First, check if the SD file is present and ignore test if it is not
         String tmpPathToSDFile = ErtlFunctionalGroupsFinderEvaluationTest.SD_FILE_PATH;
         System.out.println("\nLoading file with path: " + tmpPathToSDFile);
-        File tmpSDFile = new File(tmpPathToSDFile);
+        ClassLoader tmpClassLoader = this.getClass().getClassLoader();
+        File tmpSDFile = new File(tmpClassLoader.getResource(tmpPathToSDFile).getFile());
         if (!tmpSDFile.canRead()) {
             System.out.println("\n\tUnable to find or read a file with path \"" + tmpPathToSDFile + "\".");
             System.out.println("\nTest is ignored.");
@@ -586,7 +599,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
             return;
         }
         List<IAtomContainer> tmpMoleculesList = new LinkedList<>();
-        Aromaticity tmpCdkLegacyModel = new Aromaticity(ElectronDonation.daylight(),
+        Aromaticity tmpCdkLegacyModel = new Aromaticity(ElectronDonation.daylight(), 
                 Cycles.or(Cycles.all(), Cycles.vertexShort()));
         while (tmpReader.hasNext()) {
             try {
@@ -614,18 +627,18 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
         System.out.println("\nExtraction of functional groups from these molecules took " + (tmpEndTime - tmpStartTime) + " ms.\n");
     }
     //</editor-fold>
-
+    
     //<editor-fold defaultstate="collapsed" desc="Other tests">
     /**
      * Test for correct MoleculeHashGenerator settings/performance on some examples.
      *
-     * @throws Exception if initialize() throws an exception or a SMILES code can not be parsed into a molecule
+     * @throws java.lang.Exception if initialize() throws an exception or a SMILES code can not be parsed into a molecule
      */
     @Test
     public void testMoleculeHashGeneratorSettings() throws Exception {
         this.initialize(false, "");
         SmilesParser tmpSmilesParser = new SmilesParser(DefaultChemObjectBuilder.getInstance());
-
+        
         /*Chebi70986, Chebi16238 and Chebi57692 all contain the same functional group with pseudo SMILES code
         "O=C1N=C(C(=NR)C(=O)N1R)N(R)R", but different hybridizations in the resulting atom containers. But their hash
         codes should be the same under the given settings. This is tested exemplary for many similar cases*/
@@ -649,7 +662,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
                 Assert.assertEquals(tmpHashCode1.longValue(), tmpHashCode2.longValue());
             }
         }
-
+        
         /*Functional groups like the tertiary amine or the hydroxyl group appear with aromatic and non-aromatic central
         atoms. These two cases should be discrimated by the MoleculeHashGenerator under the given settings*/
         String tmpTertiaryAmineSmiles = "*N(*)*";
@@ -668,7 +681,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
                 tmpAtom.setIsAromatic(true);
         }
         Assert.assertNotEquals(this.molHashGenerator.generate(tmpAromMol), this.molHashGenerator.generate(tmpNonAromMol));
-
+        
         /*The following are examples of different (unique!) SMILES codes representing the same functional groups.
         They should be assigned the same hash code*/
         HashMap<String,String> tmpEquivalentSmilesMap = new HashMap<>(20);
@@ -690,10 +703,10 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
             Assert.assertEquals(this.molHashGenerator.generate(tmpKeyMol), this.molHashGenerator.generate(tmpValueMol));
         }
     }
-
+    
     /**
      * Test for correct preprocessing (neutralization of charges and selection of biggest fragment).
-     *
+     * 
      * @throws Exception if initialize() throws an exception or a SMILES code can not be parsed into a molecule
      */
     @Test
@@ -707,29 +720,30 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
 	Assert.assertEquals("OCC", tmpGenerator.create(tmpMol));
     }
     //</editor-fold>
-
+    
     //</editor-fold>
-
+    
     //<editor-fold defaultstate="collapsed" desc="Private methods">
     /**
-     * Analyzes molecules in an SD file for all four different electron donation models supplied by the cdk:
+     * Analyzes molecules in an SD file for all four different electron donation models supplied by the cdk: 
      * daylight, cdk, piBonds, cdkAllowingExocyclic and the aromaticity model cdkLegacy.
-     *
+     * 
      * @param anSDFilePath absolute path of the SD file to analyze
-     * @param aTestIdentifier a folder with this name will be created in the output directory and it will be added to
+     * @param aTestIdentifier a folder with this name will be created in the output directory and it will be added to 
      * the output and log files' names for association of test and files; may be null or empty
-     * @param anAreMultiplesCounted if false, functional groups that occur multiple times in the same molecule will
+     * @param anAreMultiplesCounted if false, functional groups that occur multiple times in the same molecule will 
      * only be counted once
-     * @throws Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
+     * @throws java.lang.Exception if initializeWithFileOperations() throws an exception or an unexpected exception occurs
      */
-    private void analyzeElectronDonationDependency(String anSDFilePath,
-            String aTestIdentifier,
+    private void analyzeElectronDonationDependency(String anSDFilePath, 
+            String aTestIdentifier, 
             boolean anAreMultiplesCounted) throws Exception {
         this.initializeWithFileOperations(anSDFilePath, aTestIdentifier);
         Assume.assumeTrue(this.isTestAbleToRun);
-
+        
         System.out.println("\nLoading file with path: " + anSDFilePath);
-        File tmpSDFile = new File(anSDFilePath);
+        ClassLoader tmpClassLoader = this.getClass().getClassLoader();
+        File tmpSDFile = new File(tmpClassLoader.getResource(anSDFilePath).getFile());
         int tmpRequiredNumberOfReaders = 5;
         IteratingSDFReader[] tmpReaders = new IteratingSDFReader[tmpRequiredNumberOfReaders];
         try {
@@ -745,24 +759,24 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
         }
         //If the 'all' CycleFinder produces an Intractable exception the 'vertexShort' CycleFinder is used
         CycleFinder tmpCycleFinder = Cycles.or(Cycles.all(), Cycles.vertexShort());
-
+        
         Aromaticity tmpDaylightModel = new Aromaticity(ElectronDonation.daylight(), tmpCycleFinder);
         Aromaticity tmpCdkModel = new Aromaticity(ElectronDonation.cdk(), tmpCycleFinder);
         Aromaticity tmpPiBondsModel = new Aromaticity(ElectronDonation.piBonds(), tmpCycleFinder);
         Aromaticity tmpCdkAllowingExocyclicModel = new Aromaticity(ElectronDonation.cdkAllowingExocyclic(), tmpCycleFinder);
         Aromaticity tmpCDKLegacyModel = Aromaticity.cdkLegacy();
-
-        this.calculateAbsoluteFGFrequencies(tmpReaders[0],
+        
+        this.calculateAbsoluteFGFrequencies(tmpReaders[0], 
                 ErtlFunctionalGroupsFinderEvaluationTest.DAYLIGHT_MODEL_SETTINGS_KEY, tmpDaylightModel, anAreMultiplesCounted);
-        this.calculateAbsoluteFGFrequencies(tmpReaders[1],
+        this.calculateAbsoluteFGFrequencies(tmpReaders[1], 
                 ErtlFunctionalGroupsFinderEvaluationTest.CDK_MODEL_SETTINGS_KEY, tmpCdkModel, anAreMultiplesCounted);
-        this.calculateAbsoluteFGFrequencies(tmpReaders[2],
+        this.calculateAbsoluteFGFrequencies(tmpReaders[2], 
                 ErtlFunctionalGroupsFinderEvaluationTest.PIBONDS_MODEL_SETTINGS_KEY, tmpPiBondsModel, anAreMultiplesCounted);
-        this.calculateAbsoluteFGFrequencies(tmpReaders[3],
+        this.calculateAbsoluteFGFrequencies(tmpReaders[3], 
                 ErtlFunctionalGroupsFinderEvaluationTest.CDK_EXOCYCLIC_MODEL_SETTINGS_KEY, tmpCdkAllowingExocyclicModel, anAreMultiplesCounted);
-        this.calculateAbsoluteFGFrequencies(tmpReaders[4],
+        this.calculateAbsoluteFGFrequencies(tmpReaders[4], 
                 ErtlFunctionalGroupsFinderEvaluationTest.CDK_LEGACY_MODEL_SETTINGS_KEY, tmpCDKLegacyModel, anAreMultiplesCounted);
-
+        
         System.out.println("\nAll analyses are done!");
         for (IteratingSDFReader tmpReader : tmpReaders) {
             tmpReader.close();
@@ -771,12 +785,12 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
         System.out.println("\nFinished!");
         System.out.println("\nNumber of occured exceptions: " + this.exceptionsCounter);
     }
-
+    
     /**
-     * Initializes all class variables except the working directory and the PrintWriter instances. This method should be
+     * Initializes all class variables except the working directory and the PrintWriter instances. This method should be 
      * called directly when a test does not require any of the specific file operations like logging or reading an SD file.
-     *
-     * @param aShouldPrintHeader true, if this method is called directly (not by initializeWithFileOperations()) and
+     * 
+     * @param aShouldPrintHeader true, if this method is called directly (not by initializeWithFileOperations()) and 
      * should print on the console that a new test was started
      * @param aTestIdentifier if aShouldPrintHeader is true this ID will be printed to the console
      */
@@ -790,7 +804,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
         this.molHashGenerator = new HashGeneratorMaker()
                 .depth(8)
                 .elemental()
-                //following line is used instead of .orbital() because the atom hybridizations take more information into
+                //following line is used instead of .orbital() because the atom hybridizations take more information into 
                 //account than the bond order sum but that is not required here
                 //Note: This works here because the ErtlFunctionalGroupsFinder extracts the relevant atoms and bonds only
                 //resulting in incomplete valences that can be used here in this way
@@ -799,7 +813,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
                 .molecular();
         this.ertlFGFinderGenOff = new ErtlFunctionalGroupsFinder(Mode.NO_GENERALIZATION);
         this.ertlFGFinderGenOn = new ErtlFunctionalGroupsFinder(Mode.DEFAULT);
-        this.masterHashMap = new HashMap(ErtlFunctionalGroupsFinderEvaluationTest.MASTER_HASHMAP_INITIAL_CAPACITY,
+        this.masterHashMap = new HashMap(ErtlFunctionalGroupsFinderEvaluationTest.MASTER_HASHMAP_INITIAL_CAPACITY, 
                 ErtlFunctionalGroupsFinderEvaluationTest.MASTER_HASHMAP_LOAD_FACTOR);
         this.settingsKeysList = new LinkedList<>();
         this.exceptionsCounter = 0;
@@ -819,19 +833,19 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
         this.pseudoSmilesAromaticElementToPlaceholderElementMap.put("P", "Pm");
         this.pseudoSmilesAromaticElementToPlaceholderElementMap.put("R", "Es");
         this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap = new HashMap<>(10, 1);
-        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Es",
+        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Es", 
                 ErtlFunctionalGroupsFinderEvaluationTest.PSEUDO_SMILES_R_ATOM);
-        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Pm",
+        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Pm", 
                 ErtlFunctionalGroupsFinderEvaluationTest.PSEUDO_SMILES_AROMATIC_PHOSPHOR);
-        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Sc",
+        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Sc", 
                 ErtlFunctionalGroupsFinderEvaluationTest.PSEUDO_SMILES_AROMATIC_SELENIUM);
-        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Os",
+        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Os", 
                 ErtlFunctionalGroupsFinderEvaluationTest.PSEUDO_SMILES_AROMATIC_OXYGEN);
         this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Sm",
                 ErtlFunctionalGroupsFinderEvaluationTest.PSEUDO_SMILES_AROMATIC_SULPHUR);
-        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Nd",
+        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Nd", 
                 ErtlFunctionalGroupsFinderEvaluationTest.PSEUDO_SMILES_AROMATIC_NITROGEN);
-        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Ce",
+        this.pseudoSmilesPlaceholderElementToPseudoSmilesSymbolMap.put("Ce", 
                 ErtlFunctionalGroupsFinderEvaluationTest.PSEUDO_SMILES_AROMATIC_CARBON);
         this.isTestAbleToRun = true;
         if (aShouldPrintHeader) {
@@ -840,12 +854,12 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
     }
     /**
      * Initializes all class variables and determines the output directory.
-     *
-     * @param anSDFilePath absolute path of the SD file to analyze for a quick pre-check if it is present and the test
+     * 
+     * @param anSDFilePath absolute path of the SD file to analyze for a quick pre-check if it is present and the test 
      * is therefore meant to run; may be empty but not null
-     * @param aTestIdentifier a folder with this name will be created in the output directory and it will be added to
+     * @param aTestIdentifier a folder with this name will be created in the output directory and it will be added to 
      * the output and log files' names for association of test and files; may be null or empty
-     * @throws Exception if one the FileWriter instances can not be instantiated, more than
+     * @throws java.lang.Exception if one the FileWriter instances can not be instantiated, more than 
      * Integer.MAX-VALUE tests are to be run this minute (error in the naming of output files), aPathOfSDFile is null or 
      * an unexpected exception occurs.
      */
@@ -855,7 +869,8 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
         System.out.println("\nInitializing class variables...");
         this.isTestAbleToRun = true;
         //First, check if the SD file is present and ignore test if it is not
-        File tmpSDFile = new File(anSDFilePath);
+        ClassLoader tmpClassLoader = this.getClass().getClassLoader();
+        File tmpSDFile = new File(tmpClassLoader.getResource(anSDFilePath).getFile());
         if (!tmpSDFile.canRead() || tmpSDFile.getAbsoluteFile().getParent() == null) {
             System.out.println("\n\tUnable to find or read a file with path \"" + anSDFilePath + "\" or to get its parent directory.");
             System.out.println("\nTest is ignored.");
@@ -972,9 +987,9 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      * only be counted once
      */
     private void calculateAbsoluteFGFrequencies(
-            IteratingSDFReader aReader,
+            IteratingSDFReader aReader, 
             String aSettingsKey, 
-            Aromaticity anAromaticity,
+            Aromaticity anAromaticity, 
             boolean anAreMultiplesCounted) {
         
         System.out.println("\nAnalyzing database using specified settings: " + aSettingsKey);
@@ -1104,7 +1119,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      * 
      * @param aMolecule the molecule to be processed
      * @return the processed molecule
-     * @throws CDKException if AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms() or neutralizeCharges()
+     * @throws CDKException if AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms() or neutralizeCharges() 
      * throws a CDKException
      */
     private IAtomContainer applyFiltersAndPreprocessing(IAtomContainer aMolecule) throws CDKException {
@@ -1219,7 +1234,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      * 
      * @param aMolecule the molecule to be neutralized
      * @return the same IAtomContainer instance as aMolecule but with neutralized charges
-     * @throws CDKException if CDKAtomTypeMatcher.findMatchingAtomType() or CDKHydrogenAdder.addImplicitHydrogens
+     * @throws CDKException if CDKAtomTypeMatcher.findMatchingAtomType() or CDKHydrogenAdder.addImplicitHydrogens 
      * throws a CDKException
      */
     private IAtomContainer neutralizeCharges(IAtomContainer aMolecule) throws CDKException {
@@ -1251,7 +1266,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
      * master Hashmap
      */
     private void enterFunctionalGroupsIntoMasterMap(
-            List<IAtomContainer> aFunctionalGroupsList,
+            List<IAtomContainer> aFunctionalGroupsList, 
             String aSettingsKey, 
             boolean anAreMultiplesCounted,
             IAtomContainer anFGContainingMolecule) {
@@ -1286,24 +1301,20 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
                 tmpNewInnerMap.put(aSettingsKey, 1);
                 String tmpSmilesCode;
                 String tmpPseudoSmilesCode;
-                double tmpMolecularWeight;
                 try {
                     //Creation of unique SMILES code
                     tmpSmilesCode = this.smilesGenerator.create(tmpFunctionalGroup);
                     //Creation of pseudo SMILES code
                     tmpPseudoSmilesCode = this.getPseudoSmilesCode(tmpFunctionalGroup);
-                    tmpMolecularWeight = Math.round(AtomContainerManipulator.getMass(tmpFunctionalGroup));
                 } catch (CDKException | NullPointerException | CloneNotSupportedException anException) {
                     if (this.areFileOperationsActivated) {
                         this.logException(anException, aSettingsKey + "Creating SMILES code", tmpFunctionalGroup);
                     }
                     tmpSmilesCode = ErtlFunctionalGroupsFinderEvaluationTest.SMILES_CODE_PLACEHOLDER;
                     tmpPseudoSmilesCode = ErtlFunctionalGroupsFinderEvaluationTest.SMILES_CODE_PLACEHOLDER;
-                    tmpMolecularWeight = 0.0;
                 }
                 tmpNewInnerMap.put(ErtlFunctionalGroupsFinderEvaluationTest.SMILES_CODE_KEY, tmpSmilesCode);
                 tmpNewInnerMap.put(ErtlFunctionalGroupsFinderEvaluationTest.PSEUDO_SMILES_CODE_KEY, tmpPseudoSmilesCode);
-                tmpNewInnerMap.put(ErtlFunctionalGroupsFinderEvaluationTest.MOLECULAR_WEIGHT_KEY, tmpMolecularWeight);
                 this.masterHashMap.put(tmpHashCode, tmpNewInnerMap);
             }
             tmpAlreadyEnteredFGsForThisMol.add(tmpHashCode);
@@ -1334,9 +1345,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
             tmpFileHeader += ErtlFunctionalGroupsFinderEvaluationTest.OUTPUT_FILE_SEPERATOR + tmpSettingsKey;
         }
         tmpFileHeader += ErtlFunctionalGroupsFinderEvaluationTest.OUTPUT_FILE_SEPERATOR 
-                + ErtlFunctionalGroupsFinderEvaluationTest.MOLECULE_OF_ORIGIN_KEY
-                + ErtlFunctionalGroupsFinderEvaluationTest.OUTPUT_FILE_SEPERATOR
-                + ErtlFunctionalGroupsFinderEvaluationTest.MOLECULAR_WEIGHT_KEY;
+                + ErtlFunctionalGroupsFinderEvaluationTest.MOLECULE_OF_ORIGIN_KEY;
         this.dataOutputPrintWriter.println(tmpFileHeader);
         this.dataOutputPrintWriter.flush();
         Iterator tmpFunctionalGroupsIterator = this.masterHashMap.keySet().iterator();
@@ -1374,8 +1383,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
                 tmpRecord += ErtlFunctionalGroupsFinderEvaluationTest.OUTPUT_FILE_SEPERATOR 
                         + ErtlFunctionalGroupsFinderEvaluationTest.MOLECULE_OF_ORIGIN_ID_PLACEHOLDER;
             }
-            tmpRecord += ErtlFunctionalGroupsFinderEvaluationTest.OUTPUT_FILE_SEPERATOR + Double.toString((double) tmpInnerMap.get(ErtlFunctionalGroupsFinderEvaluationTest.MOLECULAR_WEIGHT_KEY));
-                    this.dataOutputPrintWriter.println(tmpRecord);
+            this.dataOutputPrintWriter.println(tmpRecord);
             this.dataOutputPrintWriter.flush();
             tmpFunctionalGroupsIterator.remove();
         }
@@ -1411,7 +1419,7 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
                 }
             }
             tmpAtom.setIsAromatic(false);
-            if (tmpAtom instanceof IPseudoAtom && "R".equals(((IPseudoAtom)tmpAtom).getLabel())) {
+            if (tmpAtom instanceof IPseudoAtom && "R".equals(((IPseudoAtom)tmpAtom).getLabel())) {  
                 //second condition: see creation of R atoms in ErtlFunctionalGroupsFinder
                 IAtom tmpReplacementAtom = new Atom(this.pseudoSmilesAromaticElementToPlaceholderElementMap.get("R"));
                 Integer tmpImplicitHydrogenCount = tmpAtom.getImplicitHydrogenCount();
@@ -1514,7 +1522,6 @@ public class ErtlFunctionalGroupsFinderEvaluationTest {
 }
 
 //<editor-fold defaultstate="collapsed" desc="Enum CustomAtomEncoder">
-
 /**
  * Custom Enumeration of atom encoders for seeding atomic hash codes.
  *

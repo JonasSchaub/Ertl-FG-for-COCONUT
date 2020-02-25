@@ -4,6 +4,7 @@
  * Copyright (C) 2020 Jonas Schaub
  *
  * Source code is available at <https://github.com/JonasSchaub/Ertl-FG-for-COCONUT>
+ * ErtlFunctionalGroupsFinder for CDK is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -22,16 +23,12 @@ package org.openscience.cdk.tools;
 
 /**
  * TODO:
- * - Add check for valid atomic number in every method(?), at least in legacy pseudo SMILES method it's necessary!
- * - add note in docs that given params will be changed ('This method overwrites existing values.') and copy() should be used if that is not desired (also note that
- * the exact same objects are returned)
- * - review docs
- * - add method for FG frequency calculation requiring an iterator?
- * - Add logging methods using the class logger? Log molecule info alongside already logged exceptions?
- * - Implement non-static methods and set up logging files in this constructor? Or static initializer? Discard constructor?
+ * - add method for FG frequency calculation requiring an iterator
+ * - Implement generation of Ertl-like SMILES strings?
  */
 
 import org.openscience.cdk.Atom;
+import org.openscience.cdk.CDKConstants;
 import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
 import org.openscience.cdk.exception.CDKException;
@@ -103,16 +100,17 @@ public final class ErtlFunctionalGroupsFinderUtility {
     }
     //</editor-fold>
     //
-    //<editor-fold desc="Constructors">
+    //<editor-fold desc="Private Constructor">
     /**
-     * Constructor (currently empty)
+     * Private, uncalled Constructor.
      */
-    public ErtlFunctionalGroupsFinderUtility() {
-
+    private ErtlFunctionalGroupsFinderUtility() {
+        //Not called since this is a purely static utility class
     }
     //</editor-fold>
     //
-    //<editor-fold desc="Public static properties">
+    //<editor-fold desc="Public static methods">
+    //<editor-fold desc="Constants and new instances">
     /**
      * Returns an integer array containing all atomic numbers that can be passed on to ErtlFunctionalGroupsFinder.find().
      * All other atomic numbers are invalid because they represent metal, metalloid or pseudo ('R') atoms.
@@ -147,7 +145,7 @@ public final class ErtlFunctionalGroupsFinderUtility {
     }
 
     /**
-     * Constructs a new ErtlFunctionalGroupsFinder object with generalization of returned functional groups turned on.
+     * Constructs a new ErtlFunctionalGroupsFinder object with generalization of returned functional groups turned ON.
      *
      * @return new ErtlFunctionalGroupsFinder object that generalizes returned functional groups
      */
@@ -157,18 +155,17 @@ public final class ErtlFunctionalGroupsFinderUtility {
     }
 
     /**
-     * Constructs a new ErtlFunctionalGroupsFinder object with generalization of returned functional groups turned off.
+     * Constructs a new ErtlFunctionalGroupsFinder object with generalization of returned functional groups turned OFF.
      * So the FG will contain their full environments.
      *
      * @return new ErtlFunctionalGroupsFinder object that does NOT generalize returned functional groups
      */
-    public static ErtlFunctionalGroupsFinder getErtlFunctionalGroupsFinderNonGeneralizing() {
+    public static ErtlFunctionalGroupsFinder getErtlFunctionalGroupsFinderNotGeneralizingMode() {
         ErtlFunctionalGroupsFinder tmpEFGF = new ErtlFunctionalGroupsFinder(ErtlFunctionalGroupsFinder.Mode.NO_GENERALIZATION);
         return tmpEFGF;
     }
     //</editor-fold>
     //
-    //<editor-fold desc="Public static methods">
     //<editor-fold desc="Queries for filtering">
     /**
      * Checks whether the given molecule consists of two or more unconnected structures, e.g. ion and counter-ion.
@@ -201,9 +198,9 @@ public final class ErtlFunctionalGroupsFinderUtility {
     /**
      * Iterates through all atoms in the given molecule and checks whether they are charged. If this method returns
      * 'true', the molecule can not be passed on to ErtlFunctionalGroupsFinder.find() but should be discarded or the
-     * charges neutralized.<br>
-     *     If no charged atoms are found, this method scales linearly with O(n) with n: number of atoms in the given
-     *     molecule.
+     * charges neutralized.
+     * <br>If no charged atoms are found, this method scales linearly with O(n) with n: number of atoms in the given
+     * molecule.
      *
      * @param aMolecule the molecule to check
      * @return true, if the molecule contains one or more charged atoms
@@ -232,7 +229,7 @@ public final class ErtlFunctionalGroupsFinderUtility {
      *
      * @param anAtom the atom to check
      * @return true, if the atom is charged
-     * @throws NullPointerException if the given atom is 'null' or its formal charge
+     * @throws NullPointerException if the given atom or its formal charge is 'null'
      */
     public static boolean isAtomCharged(IAtom anAtom) throws NullPointerException {
         Objects.requireNonNull(anAtom, "Given atom is 'null'.");
@@ -242,30 +239,29 @@ public final class ErtlFunctionalGroupsFinderUtility {
     }
 
     /**
-     * Checks whether a given atom is a metal, metalloid or pseudo atom judged by its atomic number. Atoms with invalid
+     * Checks whether a given atom is a metal, metalloid or pseudo atom judging by its atomic number. Atoms with invalid
      * atomic numbers (metal, metalloid or pseudo ('R') atoms) can not be passed on to ErtlFunctionalGroupsFinder.find()
      * but should be discarded.
      *
      * @param anAtom the atom to check
      * @return true, if the atomic number is invalid or 'null'
-     * @throws NullPointerException if the given atom is 'null' or its atomic number
+     * @throws NullPointerException if the given atom or its atomic number is 'null'
      */
     public static boolean isAtomicNumberInvalid(IAtom anAtom) throws NullPointerException {
         Objects.requireNonNull(anAtom, "Given atom is 'null'.");
         Integer tmpAtomicNumber = anAtom.getAtomicNumber();
         Objects.requireNonNull(tmpAtomicNumber, "Atomic number is 'null'.");
         int tmpAtomicNumberInt = tmpAtomicNumber.intValue();
-        //boolean tmpIsAtomicNumberValid = IntStream.of(ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS).anyMatch(x -> x == tmpAtomicNumberInt);
         boolean tmpIsAtomicNumberValid = ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS_SET.contains(tmpAtomicNumberInt);
         return !tmpIsAtomicNumberValid;
     }
 
     /**
      * Iterates through all atoms in the given molecule and checks whether their atomic numbers are invalid. If this
-     * method returns 'true', the molecule can not be passed on to ErtlFunctionalGroupsFinder.find() but should be
-     * discarded.<br>
-     *     If no invalid atoms are found, this method scales linearly with O(n) with n: number of atoms in the given
-     *     molecule.
+     * method returns 'true', the molecule cannot be passed on to ErtlFunctionalGroupsFinder.find() but should be
+     * discarded.
+     * <br>If no invalid atoms are found, this method scales linearly with O(n) with n: number of atoms in the given
+     * molecule.
      *
      * @param aMolecule the molecule to check
      * @return true, if the molecule contains one or more atoms with invalid atomic numbers
@@ -311,7 +307,9 @@ public final class ErtlFunctionalGroupsFinderUtility {
             tmpShouldBeFiltered = (ErtlFunctionalGroupsFinderUtility.containsInvalidAtomicNumbers(aMolecule)
                     || ErtlFunctionalGroupsFinderUtility.isAtomOrBondCountZero(aMolecule));
         } catch (Exception anException) {
-            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.WARNING, anException.toString(), anException);
+            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.WARNING,
+                    anException.toString() + ErtlFunctionalGroupsFinderUtility.getIDForLogging(aMolecule),
+                    anException);
             tmpShouldBeFiltered = true;
         }
         return tmpShouldBeFiltered;
@@ -339,7 +337,9 @@ public final class ErtlFunctionalGroupsFinderUtility {
             tmpNeedsPreprocessing = (ErtlFunctionalGroupsFinderUtility.isMoleculeCharged(aMolecule)
                     || ErtlFunctionalGroupsFinderUtility.isStructureUnconnected(aMolecule));
         } catch (Exception anException) {
-            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.WARNING, anException.toString(), anException);
+            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.WARNING,
+                    anException.toString() + ErtlFunctionalGroupsFinderUtility.getIDForLogging(aMolecule),
+                    anException);
             throw new NullPointerException("An unknown error occurred.");
         }
         return tmpNeedsPreprocessing;
@@ -368,7 +368,9 @@ public final class ErtlFunctionalGroupsFinderUtility {
                     || ErtlFunctionalGroupsFinderUtility.isMoleculeCharged(aMolecule)
                     || ErtlFunctionalGroupsFinderUtility.isStructureUnconnected(aMolecule));
         } catch (Exception anException) {
-            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE, anException.toString(), anException);
+            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE,
+                    anException.toString() + ErtlFunctionalGroupsFinderUtility.getIDForLogging(aMolecule),
+                    anException);
             tmpIsValid = false;
         }
         return tmpIsValid;
@@ -379,9 +381,10 @@ public final class ErtlFunctionalGroupsFinderUtility {
     /**
      * Returns the biggest unconnected component/structure of the given atom container, judging by the atom count. To
      * pre-check whether the atom container consists of multiple unconnected components, use isStructureUnconnected().
-     * All set properties of aMolecule will be set as properties of the returned atom container.<br>
-     *     Iterates through all unconnected components in the given atom container, so the method scales linearly with
-     *     O(n) with n: number of unconnected components.
+     * All set properties of aMolecule will be set as properties of the returned atom container.
+     * <br>NOTE: The atom, bond etc. objects of the given atom container are re-used in the returned atom container!
+     * <br>Iterates through all unconnected components in the given atom container, so the method scales linearly with
+     * O(n) with n: number of unconnected components.
      *
      * @param aMolecule the molecule whose biggest unconnected component should be found
      * @return the biggest (judging by the atom count) unconnected component of the given atom container
@@ -407,9 +410,13 @@ public final class ErtlFunctionalGroupsFinderUtility {
      * charge treatment than a pre-defined transformation list but may produce "wrong" structures, e.g. it turns a
      * nitro NO2 group into a structure represented by the SMILES code "[H]O[N](=O)*" with an uncharged four-bonded
      * nitrogen atom (other examples are "*[N](*)(*)*", "[C]#[N]*" or "*S(*)(*)*"). Thus an improved charge
-     * neutralization scheme is desirable for future implementations. <br>
-     *     Iterates through all atoms in the given atom container, so the method scales linearly with
-     *     O(n) with n: number of atoms.
+     * neutralization scheme is desirable for future implementations.
+     * <br>NOTE: This method changes major properties and the composition of the given IAtomContainer object! If you
+     * want to retain your object unchanged for future calculations, use copy() in this class or the IAtomContainer's
+     * clone() method.
+     * <br>NOTE2: The returned IAtomContainer object is the same as the one given as parameter!
+     * <br>Iterates through all atoms in the given atom container, so the method scales linearly with
+     * O(n) with n: number of atoms.
      *
      * @param aMolecule the molecule to be neutralized
      * @return the same IAtomContainer instance as aMolecule but with neutralized charges
@@ -429,6 +436,10 @@ public final class ErtlFunctionalGroupsFinderUtility {
     /**
      * Neutralizes a charged atom in the given parent atom container by zeroing the formal atomic charge and filling up free
      * valences with implicit hydrogen atoms (according to the CDK atom types).
+     * <br>NOTE: This method changes major properties and the composition of the given IAtom and IAtomContainer object!
+     * If you want to retain your objects unchanged for future calculations, use copy() in this class or the IAtomContainer's
+     * clone() method.
+     * <br>NOTE2: The returned IAtom object is the same as the one given as parameter!
      *
      * @param anAtom the atom to be neutralized
      * @param aParentMolecule the molecule the atom belongs to
@@ -479,6 +490,10 @@ public final class ErtlFunctionalGroupsFinderUtility {
      * <br>Calling this method is equal to calling AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(aMolecule).
      * It has been given its own method here because it is a necessary step in the preprocessing for
      * ErtlFunctionalGroupsFinder.
+     * <br>NOTE: This method changes major properties of the given IAtomContainer object! If you
+     * want to retain your object unchanged for future calculations, use copy() in this class or the IAtomContainer's
+     * clone() method.
+     * <br>NOTE2: The returned IAtomContainer object is the same as the one given as parameter!
      *
      * @param aMolecule the molecule to configure
      * @return the same molecule with configured atom types
@@ -502,6 +517,10 @@ public final class ErtlFunctionalGroupsFinderUtility {
      * <br>Calling this method is equal to calling Aromaticity.apply(aMolecule) (returns boolean).
      * It has been given its own method here because it is a necessary step in the preprocessing for
      * ErtlFunctionalGroupsFinder.
+     * <br>NOTE: This method changes major properties and the composition of the given IAtomContainer object! If you
+     * want to retain your object unchanged for future calculations, use copy() in this class or the IAtomContainer's
+     * clone() method.
+     * <br>NOTE2: The returned IAtomContainer object is the same as the one given as parameter!
      *
      * @param aMolecule the molecule to apply the model to
      * @param anAromaticityModel the model to apply; Note that the choice of electron donation model and cycle finder
@@ -522,7 +541,9 @@ public final class ErtlFunctionalGroupsFinderUtility {
             //Note: Contrary to the docs, an Intractable exception might be thrown
             anAromaticityModel.apply(aMolecule);
         } catch (Intractable anIntractableException) {
-            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE, anIntractableException.toString(), anIntractableException);
+            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE,
+                    anIntractableException.toString() + ErtlFunctionalGroupsFinderUtility.getIDForLogging(aMolecule),
+                    anIntractableException);
             String tmpMessage = anIntractableException.getMessage();
             Throwable tmpCause = anIntractableException.getCause();
             throw new CDKException(tmpMessage, tmpCause);
@@ -537,6 +558,10 @@ public final class ErtlFunctionalGroupsFinderUtility {
      * preprocessing steps that are only needed in specific cases (selecting the biggest unconnected component, neutralizing
      * charges). Molecules processed by this method can be passed on to find() without problems (Caution: The return value
      * of this method is 'null' if the molecule should be discarded!).
+     * <br>NOTE: This method changes major properties and the composition of the given IAtomContainer object! If you
+     * want to retain your object unchanged for future calculations, use copy() in this class or the IAtomContainer's
+     * clone() method.
+     * <br>NOTE2: The returned IAtomContainer object is the same as the one given as parameter!
      *
      * @see ErtlFunctionalGroupsFinder#find(IAtomContainer, boolean)
      * @see ErtlFunctionalGroupsFinderUtility#shouldBeFiltered(IAtomContainer)
@@ -577,7 +602,9 @@ public final class ErtlFunctionalGroupsFinderUtility {
             //Application of aromaticity model
             ErtlFunctionalGroupsFinderUtility.applyAromaticityDetection(tmpMolecule, anAromaticityModel);
         } catch (Exception anException) {
-            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE, anException.toString(), anException);
+            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE,
+                    anException.toString() + ErtlFunctionalGroupsFinderUtility.getIDForLogging(aMolecule),
+                    anException);
             return null;
         }
         return tmpMolecule;
@@ -623,7 +650,9 @@ public final class ErtlFunctionalGroupsFinderUtility {
             tmpSDFWriter.close();
         } catch (IOException anIOException) {
             //Should not happen because nothing is written to file
-            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE, anIOException.toString(), anIOException);
+            ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.SEVERE,
+                    anIOException.toString() + ErtlFunctionalGroupsFinderUtility.getIDForLogging(aMolecule),
+                    anIOException);
         }
         String tmpSDFRepresentation = tmpStringWriter.toString();
         StringReader tmpStringReader = new StringReader(tmpSDFRepresentation);
@@ -641,15 +670,43 @@ public final class ErtlFunctionalGroupsFinderUtility {
     }
 
     /**
+     * Returns the CDK title or ID of the given molecule.
+     *
+     * @param aMolecule the molecule to determine the title or ID of
+     * @return the CDK title, title or ID of the given molecule (depending on which property is set)
+     * @throws NullPointerException if aMolecule is 'null'
+     */
+    public static String getIDForLogging(IAtomContainer aMolecule) throws NullPointerException {
+        Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
+        String tmpCdkTitle = aMolecule.getProperty(CDKConstants.TITLE);
+        String tmpTitle = aMolecule.getTitle();
+        String tmpID = aMolecule.getID();
+        if (!Objects.isNull(tmpCdkTitle) && !tmpCdkTitle.equals("")) {
+            return "CDK title: " + tmpCdkTitle;
+        } else if (!Objects.isNull(tmpTitle) && !tmpTitle.equals("")) {
+            return "Title: " + tmpTitle;
+        } else if (!Objects.isNull(tmpID) && !tmpID.equals("")) {
+            return "ID: " + tmpID;
+        } else {
+            return "Not title or id could be determined.";
+        }
+    }
+
+    /**
      * Gives the pseudo SMILES code for a given molecule / functional group. In this notation, aromatic atoms are marked
      * by asterisks (*) and pseudo atoms are indicated by 'R'.
+     * <br>The function generates the SMILES string of the given molecule using CDK's SmilesGenerator and then
+     * replaces lowercase c, n, o etc. by C*, N*, O* etc. and wildcards ('*') by 'R' in the resulting string.
+     * For that the function iterates through all characters in the generated SMILES string.
+     * <br>Note: All pseudo atoms or atoms that are represented by a wildcard ('*') in the generated SMILES string
+     * (e.g. the element [Uup] is interpreted by the CDK SmilesGenerator as a wildcard) are turned into an 'R' atom.
      *
      * @param aMolecule the molecule whose pseudo SMILES code to generate
      * @return the pseudo SMILES representation as a string
      * @throws NullPointerException if aMolecule is 'null'
      * @throws CDKException if the SMILES code of aMolecule cannot be generated
      */
-    public static String getPseudoSmilesCode(IAtomContainer aMolecule) throws NullPointerException, CDKException {
+    public static String createPseudoSmilesCode(IAtomContainer aMolecule) throws NullPointerException, CDKException {
         Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
         IAtomContainer tmpMolecule = aMolecule;
         SmilesGenerator tmpSmilesGenerator = new SmilesGenerator(SmiFlavor.Unique | SmiFlavor.UseAromaticSymbols);
@@ -741,11 +798,17 @@ public final class ErtlFunctionalGroupsFinderUtility {
      * @param aMolecule the molecule whose pseudo SMILES code to generate
      * @return the pseudo SMILES representation as a string
      * @throws NullPointerException if aMolecule is 'null'
+     * @throws IllegalArgumentException if aMolecule contains atoms of invalid atomic numbers
      * @throws CDKException if the SMILES code of aMolecule cannot be generated
+     * @see ErtlFunctionalGroupsFinderUtility#containsInvalidAtomicNumbers(IAtomContainer)
      */
     @Deprecated
-    public static String getLegacyPseudoSmilesCode(IAtomContainer aMolecule) throws NullPointerException, CDKException {
+    public static String getLegacyPseudoSmilesCode(IAtomContainer aMolecule) throws NullPointerException, IllegalArgumentException, CDKException {
         Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
+        //Note: This is necessary to ensure that the elements used for substitution are not already present in the given molecule
+        if (ErtlFunctionalGroupsFinderUtility.containsInvalidAtomicNumbers(aMolecule)) {
+            throw new IllegalArgumentException("The given molecule contains metal, metalloid or R atoms.");
+        }
         IAtomContainer tmpMolecule = aMolecule;
         Iterable<IAtom> tmpAtoms = tmpMolecule.atoms();
         HashMap<IAtom, IAtom> tmpMapForResubstitution = new HashMap(20, 0.8f);
@@ -817,14 +880,13 @@ public final class ErtlFunctionalGroupsFinderUtility {
 
 //<editor-fold defaultstate="collapsed" desc="Enum CustomAtomEncoder">
 /**
- * Custom Enumeration of atom encoders for seeding atomic hash codes.
+ * Custom enumeration of atom encoders for seeding atomic hash codes.
  *
  * @author Jonas Schaub
  * @see BasicAtomEncoder
  * @see AtomEncoder
  */
 enum CustomAtomEncoder implements AtomEncoder {
-
     /**
      * Encode whether an atom is aromatic or not. This specification is necessary to distinguish functional groups with
      * aromatic environments and those without. For example: [H]O[C] and [H]OC* (pseudo SMILES codes) should be
