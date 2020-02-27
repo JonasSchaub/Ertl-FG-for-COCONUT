@@ -43,7 +43,10 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
+ * Tests functionalities of ErtlFunctionalGroupsFinderUtility class.
  *
+ * @author Jonas Schaub
+ * @version 1.0.0.0
  */
 public class ErtlFunctionalGroupsFinderUtilityTest {
     /**
