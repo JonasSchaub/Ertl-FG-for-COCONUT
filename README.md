@@ -28,7 +28,7 @@ IDE (e.g. IntelliJ) as a Gradle project and execute the <i>build.gradle</i> file
 * [ErtlFunctionalGroupsFinder on GitHub](https://www.github.com/zielesny/ErtlFunctionalGroupsFinder)
 
 **COCONUT**
-* [Sorokina M, Steinbeck C. On the Redundancy of Natural Products Public Databases and Where to Find Data in 2020 - A Review on Natural Products Databases. Preprints 2019, 2019120332](https://www.doi.org/10.20944/preprints201912.0332.v1)
+* [Sorokina M, Steinbeck C. Review on natural products databases: where to find data in 2020. J Cheminform. 2020); 12:20](https://doi.org/10.1186/s13321-020-00424-9)
 * [COCONUT on GitHub](https://github.com/mSorok/COCONUT)
 
 **Ertl algorithm**
