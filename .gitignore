@@ -39,3 +39,6 @@ gradle-app.setting
 
 # Cache of project
 .gradletasknamecache
+
+# Output folders
+/CreateCoconutSdfTest_Output
