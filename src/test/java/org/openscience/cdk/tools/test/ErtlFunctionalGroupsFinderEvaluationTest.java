@@ -1,4 +1,4 @@
-/**
+/*
  * Evaluation tests for
  * ErtlFunctionalGroupsFinder for CDK
  * Copyright (C) 2020 Jonas Schaub

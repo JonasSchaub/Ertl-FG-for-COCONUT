@@ -1,4 +1,4 @@
-/**
+/*
  * Uses
  * ErtlFunctionalGroupsFinder for CDK
  * to extract functional groups from a database of natural products

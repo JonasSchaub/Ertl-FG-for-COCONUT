@@ -1,4 +1,4 @@
-/**
+/*
  * Uses
  * ErtlFunctionalGroupsFinder for CDK
  * to extract functional groups from a database of natural products
@@ -116,7 +116,7 @@ public class ErtlFunctionalGroupsForCoconutTest {
     /**
      * Name of the document variable that contains the SMILES code string of the given molecule
      */
-    private static final String SMILES_CODE_KEY = "clean_smiles"; //clean_smiles or smiles
+    private static final String SMILES_CODE_KEY = "smiles"; //clean_smiles or smiles
 
     /**
      * Separator for the results file (csv)
