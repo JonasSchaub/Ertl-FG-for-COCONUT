@@ -22,7 +22,7 @@
 package org.openscience.cdk.tools;
 
 /**
- * TODO:
+ * Ideas:
  * - add method for FG frequency calculation requiring an iterator
  * - Implement generation of Ertl-like SMILES strings?
  */
@@ -54,7 +54,13 @@ import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -66,7 +72,7 @@ import java.util.logging.Logger;
  * @author Jonas Schaub
  * @version 1.0.0.0
  */
-public final class ErtlFunctionalGroupsFinderUtility {
+public class ErtlFunctionalGroupsFinderUtility {
     //<editor-fold desc="Private static final class constants">
     /**
      * Atomic numbers that ErtlFunctionalGroupsFinder accepts, see getValidAtomicNumbers()
@@ -93,15 +99,6 @@ public final class ErtlFunctionalGroupsFinderUtility {
         for (int i : ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS) {
             ErtlFunctionalGroupsFinderUtility.VALID_ATOMIC_NUMBERS_SET.add(i);
         }
-    }
-    //</editor-fold>
-    //
-    //<editor-fold desc="Private Constructor">
-    /**
-     * Private, uncalled Constructor.
-     */
-    private ErtlFunctionalGroupsFinderUtility() {
-        //Not called since this is a purely static utility class
     }
     //</editor-fold>
     //
@@ -662,7 +659,7 @@ public final class ErtlFunctionalGroupsFinderUtility {
 
     /**
      * Aims at doing a deep copy of the given atom container, i.e. all information stored in the object is copied exactly
-     * but original and copy do not share any references. The method used here writes an SD representation (via CDK's
+     * but original and copy do not share any references. The method used here writes an SDF representation (via CDK's
      * SDFWriter) of the given atom container as a string and then constructs a new atom container by reading this string
      * using IteratingSDFReader. Furthermore, all properties that were stored in the original atom container are transferred
      * to the clone.
