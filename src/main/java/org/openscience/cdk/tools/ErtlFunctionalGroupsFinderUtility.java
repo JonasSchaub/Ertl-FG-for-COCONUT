@@ -1,7 +1,7 @@
 /*
  * Utilities for
  * ErtlFunctionalGroupsFinder for CDK
- * Copyright (C) 2020 Jonas Schaub
+ * Copyright (C) 2021 Jonas Schaub
  *
  * Source code is available at <https://github.com/JonasSchaub/Ertl-FG-for-COCONUT>
  * ErtlFunctionalGroupsFinder for CDK is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
@@ -70,9 +70,37 @@ import java.util.logging.Logger;
  * become bottle necks in parallelized computations.
  *
  * @author Jonas Schaub
- * @version 1.0.0.0
+ * @version 1.0.0.1
  */
 public class ErtlFunctionalGroupsFinderUtility {
+    //<editor-fold defaultstate="collapsed" desc="Enum CustomAtomEncoder">
+    /**
+     * Custom enumeration of atom encoders for seeding atomic hash codes.
+     *
+     * @author Jonas Schaub
+     * @see BasicAtomEncoder
+     * @see AtomEncoder
+     */
+    enum CustomAtomEncoder implements AtomEncoder {
+        /**
+         * Encode whether an atom is aromatic or not. This specification is necessary to distinguish functional groups with
+         * aromatic environments and those without. For example: [H]O[C] and [H]OC* (pseudo SMILES codes) should be
+         * assigned different hash codes by the MoleculeHashGenerator.
+         *
+         * @see IAtom#isAromatic()
+         */
+        AROMATICITY {
+            /**
+             *{@inheritDoc}
+             */
+            @Override
+            public int encode(IAtom anAtom, IAtomContainer aContainer) {
+                return anAtom.isAromatic()? 3 : 2;
+            }
+        };
+    }
+    //</editor-fold>
+    //
     //<editor-fold desc="Private static final class constants">
     /**
      * Atomic numbers that ErtlFunctionalGroupsFinder accepts, see getValidAtomicNumbers()
@@ -421,7 +449,7 @@ public class ErtlFunctionalGroupsFinderUtility {
         Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
         Iterable<IAtom> tmpAtoms = aMolecule.atoms();
         for (IAtom tmpAtom : tmpAtoms) {
-                tmpAtom = ErtlFunctionalGroupsFinderUtility.neutralizeCharges(tmpAtom, aMolecule);
+            tmpAtom = ErtlFunctionalGroupsFinderUtility.neutralizeCharges(tmpAtom, aMolecule);
         }
         return aMolecule;
     }
@@ -606,7 +634,14 @@ public class ErtlFunctionalGroupsFinderUtility {
     //
     //<editor-fold desc="Other">
     /**
-     * TODO
+     * Extracts functional groups from the given molecule, using the Ertl algorithm / ErtlFunctionalGroupsFinder, but
+     * only the marked atoms of every functional group are returned. They do not contain their environment (i.e. connected,
+     * unmarked carbon atoms) and are also not generalized.
+     *
+     * @param aMolecule the molecule to extracts functional groups from; it is not cloned in this method
+     * @return List of IAtomContainer objects representing the detected functional groups
+     * @throws NullPointerException if the given atom container is null
+     * @throws IllegalArgumentException if the given atom container cannot be fragmented
      */
     public static List<IAtomContainer> findMarkedAtoms(IAtomContainer aMolecule) throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(aMolecule, "Given molecule is null.");
@@ -615,7 +650,7 @@ public class ErtlFunctionalGroupsFinderUtility {
         }
         boolean tmpCanBeFragmented = ErtlFunctionalGroupsFinderUtility.isValidArgumentForFindMethod(aMolecule);
         if (!tmpCanBeFragmented) {
-            throw new IllegalArgumentException("Given molecule cannot be frgamented but needs to be filtered or preprocessed.");
+            throw new IllegalArgumentException("Given molecule cannot be fragmented but needs to be filtered or preprocessed.");
         }
         HashMap<Integer, IAtom> tmpIdToAtomMap = new HashMap<>(aMolecule.getAtomCount() + 1, 1);
         for (int i = 0; i < aMolecule.getAtomCount(); i++) {
@@ -755,8 +790,14 @@ public class ErtlFunctionalGroupsFinderUtility {
         Objects.requireNonNull(aMolecule, "Given molecule is 'null'.");
         IAtomContainer tmpMolecule = aMolecule;
         SmilesGenerator tmpSmilesGenerator = new SmilesGenerator(SmiFlavor.Unique | SmiFlavor.UseAromaticSymbols);
-        //Might throw CDKException if the SMILES string cannot be created
-        String tmpPseudoSmilesCode = tmpSmilesGenerator.create(tmpMolecule);
+        String tmpPseudoSmilesCode;
+        try {
+            //Might throw CDKException if the SMILES string cannot be created or NullPointerException if an atom has an
+            //  undefined number of implicit hydrogen atoms in the SMILES string
+            tmpPseudoSmilesCode = tmpSmilesGenerator.create(tmpMolecule);
+        } catch (NullPointerException anException) {
+            throw new CDKException(anException.getMessage(), anException);
+        }
         tmpPseudoSmilesCode = tmpPseudoSmilesCode.replaceAll("\\*", "R");
         tmpPseudoSmilesCode = tmpPseudoSmilesCode.replaceAll("\\[se", "[Se*");
         StringBuilder tmpStringBuilder = new StringBuilder(tmpPseudoSmilesCode);
@@ -902,8 +943,14 @@ public class ErtlFunctionalGroupsFinderUtility {
             }
         }
         SmilesGenerator tmpSmilesGenerator = new SmilesGenerator(SmiFlavor.Unique);
-        //Might throw CDKException
-        String tmpPseudoSmilesCode = tmpSmilesGenerator.create(tmpMolecule);
+        String tmpPseudoSmilesCode;
+        try {
+            //Might throw CDKException if the SMILES string cannot be created or NullPointerException if an atom has an
+            //  undefined number of implicit hydrogen atoms in the SMILES string
+            tmpPseudoSmilesCode = tmpSmilesGenerator.create(tmpMolecule);
+        } catch (NullPointerException anException) {
+            throw new CDKException(anException.getMessage(), anException);
+        }
         for (String tmpPlaceholderElementSymbol : placeholderElementToPseudoSmilesSymbolMap.keySet()) {
             tmpPseudoSmilesCode = tmpPseudoSmilesCode.replaceAll("(\\[" + tmpPlaceholderElementSymbol + "\\])",
                     placeholderElementToPseudoSmilesSymbolMap.get(tmpPlaceholderElementSymbol))
@@ -922,31 +969,3 @@ public class ErtlFunctionalGroupsFinderUtility {
     //</editor-fold>
     //</editor-fold>
 }
-
-//<editor-fold defaultstate="collapsed" desc="Enum CustomAtomEncoder">
-/**
- * Custom enumeration of atom encoders for seeding atomic hash codes.
- *
- * @author Jonas Schaub
- * @see BasicAtomEncoder
- * @see AtomEncoder
- */
-enum CustomAtomEncoder implements AtomEncoder {
-    /**
-     * Encode whether an atom is aromatic or not. This specification is necessary to distinguish functional groups with
-     * aromatic environments and those without. For example: [H]O[C] and [H]OC* (pseudo SMILES codes) should be
-     * assigned different hash codes by the MoleculeHashGenerator.
-     *
-     * @see IAtom#isAromatic()
-     */
-    AROMATICITY {
-        /**
-         *{@inheritDoc}
-         */
-        @Override
-        public int encode(IAtom anAtom, IAtomContainer aContainer) {
-            return anAtom.isAromatic()? 3 : 2;
-        }
-    };
-}
-//</editor-fold>
