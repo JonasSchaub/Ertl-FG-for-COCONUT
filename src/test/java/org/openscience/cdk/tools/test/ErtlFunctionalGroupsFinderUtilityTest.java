@@ -33,10 +33,13 @@ import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.hash.MoleculeHashGenerator;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
+import org.openscience.cdk.smiles.SmiFlavor;
 import org.openscience.cdk.smiles.SmilesGenerator;
 import org.openscience.cdk.smiles.SmilesParser;
+import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.ErtlFunctionalGroupsFinder;
 import org.openscience.cdk.tools.ErtlFunctionalGroupsFinderUtility;
+import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -111,7 +114,6 @@ public class ErtlFunctionalGroupsFinderUtilityTest {
                 Assert.assertEquals(tmpHashCode1.longValue(), tmpHashCode2.longValue());
             }
         }
-
         /*Functional groups like the tertiary amine or the hydroxyl group appear with aromatic and non-aromatic central
         atoms. These two cases should be discriminated by the MoleculeHashGenerator under the given settings*/
         String tmpTertiaryAmineSmiles = "*N(*)*";
@@ -130,7 +132,6 @@ public class ErtlFunctionalGroupsFinderUtilityTest {
                 tmpAtom.setIsAromatic(true);
         }
         Assert.assertNotEquals(tmpHashGenerator.generate(tmpAromMol), tmpHashGenerator.generate(tmpNonAromMol));
-
         /*The following are examples of different (unique!) SMILES codes representing the same functional groups.
         They should be assigned the same hash code*/
         HashMap<String,String> tmpEquivalentSmilesMap = new HashMap<>(20);
@@ -166,5 +167,49 @@ public class ErtlFunctionalGroupsFinderUtilityTest {
         tmpMol = ErtlFunctionalGroupsFinderUtility.applyFiltersAndPreprocessing(tmpMol, Aromaticity.cdkLegacy());
         SmilesGenerator tmpGenerator = SmilesGenerator.unique();
         Assert.assertEquals("OCC", tmpGenerator.create(tmpMol));
+    }
+
+    /**
+     *
+     */
+    @Test
+    public void testRestorationOfEnvironmentalCarbons() throws Exception {
+        SmilesParser tmpSmiPar = new SmilesParser(DefaultChemObjectBuilder.getInstance());
+        SmilesGenerator tmpSmiGen = new SmilesGenerator(SmiFlavor.Unique);
+        //Adenophostin B, COCONUT ID CNP0214672
+        IAtomContainer tmpMolecule = tmpSmiPar.parseSmiles("O=C(OCC1OC(OC2C(OC(N3C=NC=4C(=NC=NC43)N)C2OP(=O)(O)O)CO)C(O)C(OP(=O)(O)O)C1OP(=O)(O)O)C");
+        ErtlFunctionalGroupsFinder tmpEFGFFullEnv = ErtlFunctionalGroupsFinderUtility.getErtlFunctionalGroupsFinderNotGeneralizingMode();
+        List<IAtomContainer> tmpFGList = tmpEFGFFullEnv.find(tmpMolecule, false);
+        System.out.println("FGs with full environment returned by EFGF:");
+        for (IAtomContainer tmpFG : tmpFGList) {
+            System.out.println(tmpSmiGen.create(tmpFG));
+        }
+        ErtlFunctionalGroupsFinderUtility.restoreOriginalEnvironmentalCarbons(tmpFGList, tmpMolecule, false, false);
+        System.out.println("FGs with full environment, environmental carbons restored:");
+        for (IAtomContainer tmpFG : tmpFGList) {
+            System.out.println(tmpSmiGen.create(tmpFG));
+        }
+        ErtlFunctionalGroupsFinderUtility.restoreOriginalEnvironmentalCarbons(tmpFGList, tmpMolecule, true, true);
+        System.out.println("FGs with full environment, environmental carbons restored, explicit hydrogens removed and empty valences filled:");
+        for (IAtomContainer tmpFG : tmpFGList) {
+            System.out.println(tmpSmiGen.create(tmpFG));
+        }
+        tmpMolecule = tmpSmiPar.parseSmiles("O=C(OCC1OC(OC2C(OC(N3C=NC=4C(=NC=NC43)N)C2OP(=O)(O)O)CO)C(O)C(OP(=O)(O)O)C1OP(=O)(O)O)C");
+        ErtlFunctionalGroupsFinder tmpEFGFgeneralized = ErtlFunctionalGroupsFinderUtility.getErtlFunctionalGroupsFinderGeneralizingMode();
+        tmpFGList = tmpEFGFgeneralized.find(tmpMolecule, false);
+        System.out.println("FGs with generalized environment returned by EFGF:");
+        for (IAtomContainer tmpFG : tmpFGList) {
+            System.out.println(tmpSmiGen.create(tmpFG));
+        }
+        ErtlFunctionalGroupsFinderUtility.restoreOriginalEnvironmentalCarbons(tmpFGList, tmpMolecule, false, false);
+        System.out.println("FGs with generalized environment, environmental carbons restored:");
+        for (IAtomContainer tmpFG : tmpFGList) {
+            System.out.println(tmpSmiGen.create(tmpFG));
+        }
+        ErtlFunctionalGroupsFinderUtility.restoreOriginalEnvironmentalCarbons(tmpFGList, tmpMolecule, true, true);
+        System.out.println("FGs with generalized environment, environmental carbons restored, explicit hydrogens removed and empty valences filled:");
+        for (IAtomContainer tmpFG : tmpFGList) {
+            System.out.println(tmpSmiGen.create(tmpFG));
+        }
     }
 }

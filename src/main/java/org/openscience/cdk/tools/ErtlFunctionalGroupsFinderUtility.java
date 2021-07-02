@@ -29,6 +29,7 @@ package org.openscience.cdk.tools;
 
 import org.openscience.cdk.Atom;
 import org.openscience.cdk.CDKConstants;
+import org.openscience.cdk.DefaultChemObjectBuilder;
 import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
 import org.openscience.cdk.exception.CDKException;
@@ -65,17 +66,19 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * This class gives utility methods for using ErtlFunctionalGroupsFinder.
- * <br>NOTE: It is not implemented having parallelized operations in mind! There are some static objects that can
- * become bottle necks in parallelized computations.
+ * This class gives utility methods for using <a href="https://github.com/zielesny/ErtlFunctionalGroupsFinder">ErtlFunctionalGroupsFinder</a>,
+ * a CDK-based implementation, published <a href="https://doi.org/10.1186/s13321-019-0361-8">here</a>, of the
+ * <a href="https://doi.org/10.1186/s13321-017-0225-z">Ertl algorithm for automated functional groups detection</a>.
+ * The methods of this class are basically public static re-implementations of the routines used for testing and
+ * evaluating the ErtlFunctionalGroupsFinder, as described in the publication.
  *
  * @author Jonas Schaub
- * @version 1.0.0.1
+ * @version 1.0.1.0
  */
 public class ErtlFunctionalGroupsFinderUtility {
     //<editor-fold defaultstate="collapsed" desc="Enum CustomAtomEncoder">
     /**
-     * Custom enumeration of atom encoders for seeding atomic hash codes.
+     * Enumeration of custom atom encoders for seeding atomic hash codes.
      *
      * @author Jonas Schaub
      * @see BasicAtomEncoder
@@ -690,6 +693,136 @@ public class ErtlFunctionalGroupsFinderUtility {
             }
         }
         return tmpFunctionalGroups;
+    }
+
+    /**
+     * Replaces the environmental carbon or pseudo-atoms (new IAtom objects) inserted by the EFGF in an identified
+     * functional group with the carbon IAtom objects from the original molecule object.
+     * <br>Important note: This method only works if the atom container has not been cloned for the extraction of
+     * functional groups by ErtlFunctionalGroupsFinder. Use the method
+     * "List<IAtomContainer> find(IAtomContainer container, boolean clone)" with clone set to false for this purpose.
+     * <br>Also note that the result differs if the environment has been generalized by the EFGF or not. In the former
+     * case, only environmental carbon atoms replaced by R-atoms in the generalized FG are restored.
+     *
+     * @param aListOfFunctionalGroups functional groups of the molecule identified by EFGF
+     * @param aMolecule original structure in which the groups were identified
+     * @param aConvertExplicitHydrogens should explicit hydrogen atoms in the functional groups be converted to implicit
+     *                                  hydrogens
+     * @param aFillEmptyValences should empty valences on the restored environmental carbon atoms be filled with
+     *                           implicit hydrogen atoms
+     * @throws NullPointerException if a parameter is null
+     * @throws IllegalArgumentException if one of the functional groups does not originate from the given molecule
+     *                                  or the molecule has been cloned for the extraction of functional groups
+     * @author Michael Wenk, Jonas Schaub
+     */
+    public static void restoreOriginalEnvironmentalCarbons(
+            List<IAtomContainer> aListOfFunctionalGroups,
+            IAtomContainer aMolecule,
+            boolean aConvertExplicitHydrogens,
+            boolean aFillEmptyValences)
+            throws NullPointerException, IllegalArgumentException {
+        //<editor-fold desc="Parameter checks">
+        Objects.requireNonNull(aListOfFunctionalGroups, "Given list of functional groups is null.");
+        Objects.requireNonNull(aMolecule, "Given molecule is null.");
+        if (aListOfFunctionalGroups.isEmpty()) {
+            return;
+        }
+        if (aMolecule.isEmpty()) {
+            throw new IllegalArgumentException("Given molecule is empty.");
+        }
+        for (IAtomContainer tmpFG : aListOfFunctionalGroups) {
+            boolean tmpIsFGofMolecule = false;
+            for (IAtom tmpAtom : tmpFG.atoms()) {
+                if (aMolecule.contains(tmpAtom)) {
+                    tmpIsFGofMolecule = true;
+                }
+            }
+            if (!tmpIsFGofMolecule) {
+                throw new IllegalArgumentException("At least one functional group has been given that does not originate " +
+                        "from the given molecule or the molecule has been cloned for the extraction of functional groups.");
+            }
+        }
+        //</editor-fold>
+        CDKHydrogenAdder tmpHadder = CDKHydrogenAdder.getInstance(DefaultChemObjectBuilder.getInstance());
+        for (int i = 0; i < aListOfFunctionalGroups.size(); i++) {
+            IAtomContainer tmpFG = aListOfFunctionalGroups.get(i);
+            //convert explicit hydrogens to implicit
+            if (aConvertExplicitHydrogens) {
+                ErtlFunctionalGroupsFinderUtility.convertExplicitToImplicitHydrogens(tmpFG);
+            }
+            //create a list of all atoms of the group because of atom removals and additions in group atom container
+            List<IAtom> tmpListofFGatoms = new ArrayList<>();
+            for (IAtom tmpAtom : tmpFG.atoms()) {
+                tmpListofFGatoms.add(tmpAtom);
+            }
+            for (IAtom tmpAtom : tmpListofFGatoms) {
+                //technically, all elements except carbon should be excluded but this way, it is the easiest to also include
+                // pseudo atoms
+                if (tmpAtom.getAtomicNumber().equals(1)) {
+                    continue;
+                }
+                //detect whether the current atom is an "unknown" one, inserted as new environmental IAtom object
+                if (!aMolecule.contains(tmpAtom)) {
+                    //environmental carbon and pseudo-atoms (carbon or hydrogen) added by the EFGF can only have one bond partner in the FG.
+                    // identify its bond partner in the FG that should be part of the original molecule
+                    IAtom tmpConnectedAtomInGroup = tmpFG.getConnectedAtomsList(tmpAtom).get(0);
+                    //remove the inserted atom and the bond to it
+                    tmpFG.removeBond(tmpAtom, tmpConnectedAtomInGroup);
+                    tmpFG.removeAtom(tmpAtom);
+                    //starting from the parent atom search for neighboring carbons which are not already in the group and add them
+                    for (IAtom tmpConnectedAtomInOriginalStructure : aMolecule.getConnectedAtomsList(tmpConnectedAtomInGroup)) {
+                        if (tmpConnectedAtomInOriginalStructure.getSymbol().equals("C")
+                                && !tmpFG.contains(tmpConnectedAtomInOriginalStructure)) {
+                            tmpFG.addAtom(tmpConnectedAtomInOriginalStructure);
+                            tmpFG.addBond(aMolecule.getBond(tmpConnectedAtomInGroup, tmpConnectedAtomInOriginalStructure));
+                        }
+                    }
+                }
+            }
+            if (aFillEmptyValences) {
+                try {
+                    AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(tmpFG);
+                    tmpHadder.addImplicitHydrogens(tmpFG);
+                } catch (CDKException aCDKException) {
+                    ErtlFunctionalGroupsFinderUtility.LOGGER.log(Level.WARNING, aCDKException.toString(), aCDKException);
+                    continue;
+                }
+            }
+        }
+    }
+
+    /**
+     * Converts all explicit hydrogen atoms in the given molecule to implicit hydrogens, increasing the respective counters
+     * on the heavy atom objects. Note that the given atom container object is altered.
+     *
+     * @param aMolecule the structure the convert all explicit hydrogens of
+     * @throws NullPointerException if the given molecule is null
+     * @author Michael Wenk, Jonas Schaub
+     */
+    public static void convertExplicitToImplicitHydrogens(IAtomContainer aMolecule) throws NullPointerException {
+        Objects.requireNonNull(aMolecule, "Given molecule is null.");
+        if (aMolecule.isEmpty()) {
+            return;
+        }
+        List<IAtom> tmpRemoveList = new ArrayList<>();
+        IAtom tmpAtomB;
+        for (IAtom tmpAtomA : aMolecule.atoms()) {
+            //check each atom for whether it is a hydrogen;
+            // if yes, increase the number of implicit hydrogens for its connected heavy atom
+            if (tmpAtomA.getAtomicNumber().equals(1)) {
+                tmpAtomB = aMolecule.getConnectedAtomsList(tmpAtomA).get(0);
+                //precaution for unset property
+                if (tmpAtomB.getImplicitHydrogenCount() == null) {
+                    tmpAtomB.setImplicitHydrogenCount(0);
+                }
+                tmpAtomB.setImplicitHydrogenCount(tmpAtomB.getImplicitHydrogenCount() + 1);
+                tmpRemoveList.add(tmpAtomA);
+            }
+        }
+        //remove all explicit hydrogen atoms from the molecule
+        for (IAtom tmpAtom : tmpRemoveList) {
+            aMolecule.removeAtom(tmpAtom);
+        }
     }
 
     /**
