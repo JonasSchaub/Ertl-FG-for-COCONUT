@@ -1,7 +1,7 @@
 /*
  * Test of Utilities for
  * ErtlFunctionalGroupsFinder for CDK
- * Copyright (C) 2020 Jonas Schaub
+ * Copyright (C) 2021 Jonas Schaub
  *
  * Source code is available at <https://github.com/JonasSchaub/Ertl-FG-for-COCONUT>
  * ErtlFunctionalGroupsFinder for CDK is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
@@ -36,10 +36,8 @@ import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.smiles.SmiFlavor;
 import org.openscience.cdk.smiles.SmilesGenerator;
 import org.openscience.cdk.smiles.SmilesParser;
-import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.ErtlFunctionalGroupsFinder;
 import org.openscience.cdk.tools.ErtlFunctionalGroupsFinderUtility;
-import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 
 import java.util.HashMap;
 import java.util.LinkedList;
