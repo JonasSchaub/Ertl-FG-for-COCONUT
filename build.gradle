@@ -13,8 +13,8 @@ repositories {
 }
 
 dependencies {
-    testImplementation group: 'junit', name: 'junit', version: '4.13'
-    compile(group: 'org.openscience.cdk', name: 'cdk-bundle', version: '2.3')
+    testImplementation group: 'junit', name: 'junit', version: '4.12'
+    compile(group: 'org.openscience.cdk', name: 'cdk-bundle', version: '2.2')
     compile(group: 'org.mongodb', name: 'mongodb-driver-sync', version: '3.11.1')
 }
 

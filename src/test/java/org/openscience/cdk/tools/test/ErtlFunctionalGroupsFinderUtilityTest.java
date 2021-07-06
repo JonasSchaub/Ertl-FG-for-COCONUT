@@ -23,7 +23,7 @@ package org.openscience.cdk.tools.test;
 
 /**
  * TODO:
- * - Implement tests for copy method and other functionalities
+ * -
  */
 
 import org.junit.Assert;
@@ -39,6 +39,7 @@ import org.openscience.cdk.smiles.SmilesParser;
 import org.openscience.cdk.tools.ErtlFunctionalGroupsFinder;
 import org.openscience.cdk.tools.ErtlFunctionalGroupsFinderUtility;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -47,7 +48,7 @@ import java.util.List;
  * Tests functionalities of ErtlFunctionalGroupsFinderUtility class.
  *
  * @author Jonas Schaub
- * @version 1.0.0.0
+ * @version 1.0.1.0
  */
 public class ErtlFunctionalGroupsFinderUtilityTest {
     /**
@@ -162,13 +163,18 @@ public class ErtlFunctionalGroupsFinderUtilityTest {
         String tmpSmiles = "CC[O-].C";
         SmilesParser tmpSmilesParser = new SmilesParser(DefaultChemObjectBuilder.getInstance());
         IAtomContainer tmpMol = tmpSmilesParser.parseSmiles(tmpSmiles);
+        Assert.assertTrue(ErtlFunctionalGroupsFinderUtility.shouldBePreprocessed(tmpMol));
+        Assert.assertFalse(ErtlFunctionalGroupsFinderUtility.shouldBeFiltered(tmpMol));
         tmpMol = ErtlFunctionalGroupsFinderUtility.applyFiltersAndPreprocessing(tmpMol, Aromaticity.cdkLegacy());
-        SmilesGenerator tmpGenerator = SmilesGenerator.unique();
+        SmilesGenerator tmpGenerator = new SmilesGenerator(SmiFlavor.Unique);
         Assert.assertEquals("OCC", tmpGenerator.create(tmpMol));
     }
 
     /**
+     * Tests the restoration of environmental carbon atom objects on one example molecule. Nothing is asserted here, it
+     * is meant for visual inspection.
      *
+     * @throws Exception if anything goes wrong
      */
     @Test
     public void testRestorationOfEnvironmentalCarbons() throws Exception {
@@ -177,6 +183,7 @@ public class ErtlFunctionalGroupsFinderUtilityTest {
         //Adenophostin B, COCONUT ID CNP0214672
         IAtomContainer tmpMolecule = tmpSmiPar.parseSmiles("O=C(OCC1OC(OC2C(OC(N3C=NC=4C(=NC=NC43)N)C2OP(=O)(O)O)CO)C(O)C(OP(=O)(O)O)C1OP(=O)(O)O)C");
         ErtlFunctionalGroupsFinder tmpEFGFFullEnv = ErtlFunctionalGroupsFinderUtility.getErtlFunctionalGroupsFinderNotGeneralizingMode();
+        tmpMolecule = ErtlFunctionalGroupsFinderUtility.applyFiltersAndPreprocessing(tmpMolecule, Aromaticity.cdkLegacy());
         List<IAtomContainer> tmpFGList = tmpEFGFFullEnv.find(tmpMolecule, false);
         System.out.println("FGs with full environment returned by EFGF:");
         for (IAtomContainer tmpFG : tmpFGList) {
@@ -194,6 +201,7 @@ public class ErtlFunctionalGroupsFinderUtilityTest {
         }
         tmpMolecule = tmpSmiPar.parseSmiles("O=C(OCC1OC(OC2C(OC(N3C=NC=4C(=NC=NC43)N)C2OP(=O)(O)O)CO)C(O)C(OP(=O)(O)O)C1OP(=O)(O)O)C");
         ErtlFunctionalGroupsFinder tmpEFGFgeneralized = ErtlFunctionalGroupsFinderUtility.getErtlFunctionalGroupsFinderGeneralizingMode();
+        tmpMolecule = ErtlFunctionalGroupsFinderUtility.applyFiltersAndPreprocessing(tmpMolecule, Aromaticity.cdkLegacy());
         tmpFGList = tmpEFGFgeneralized.find(tmpMolecule, false);
         System.out.println("FGs with generalized environment returned by EFGF:");
         for (IAtomContainer tmpFG : tmpFGList) {
@@ -209,5 +217,63 @@ public class ErtlFunctionalGroupsFinderUtilityTest {
         for (IAtomContainer tmpFG : tmpFGList) {
             System.out.println(tmpSmiGen.create(tmpFG));
         }
+    }
+
+    /**
+     * Imports a charged molecule with a counter-ion from ChEMBL to test the filtering and preprocessing routines
+     * of ErtlFunctionalGroupsFinderUtility.
+     *
+     * @throws Exception if anything goes wrong
+     */
+    @Test
+    public void testOnMolecule() throws Exception {
+        SmilesParser tmpSmiPar = new SmilesParser(DefaultChemObjectBuilder.getInstance());
+        //CHEMBL1201736
+        IAtomContainer tmpMolecule = tmpSmiPar.parseSmiles("CO/N=C(\\C(=O)N[C@@H]1C(=O)N2C(C(=O)[O-])=C(C[N+]3(C)CCCC3)CS[C@H]12)c1csc(N)n1.Cl");
+        Assert.assertTrue(ErtlFunctionalGroupsFinderUtility.isStructureUnconnected(tmpMolecule));
+        Assert.assertTrue(ErtlFunctionalGroupsFinderUtility.isMoleculeCharged(tmpMolecule));
+        Assert.assertFalse(ErtlFunctionalGroupsFinderUtility.isAtomOrBondCountZero(tmpMolecule));
+        Assert.assertFalse(ErtlFunctionalGroupsFinderUtility.containsInvalidAtomicNumbers(tmpMolecule));
+        Assert.assertFalse(ErtlFunctionalGroupsFinderUtility.shouldBeFiltered(tmpMolecule));
+        Assert.assertTrue(ErtlFunctionalGroupsFinderUtility.shouldBePreprocessed(tmpMolecule));
+        Assert.assertFalse(ErtlFunctionalGroupsFinderUtility.isValidArgumentForFindMethod(tmpMolecule));
+        tmpMolecule = ErtlFunctionalGroupsFinderUtility.selectBiggestUnconnectedComponent(tmpMolecule);
+        Assert.assertNotNull(tmpMolecule);
+        ErtlFunctionalGroupsFinderUtility.neutralizeCharges(tmpMolecule);
+        ErtlFunctionalGroupsFinderUtility.perceiveAtomTypesAndConfigureAtoms(tmpMolecule);
+        ErtlFunctionalGroupsFinderUtility.applyAromaticityDetection(tmpMolecule, Aromaticity.cdkLegacy());
+        Assert.assertTrue(ErtlFunctionalGroupsFinderUtility.isValidArgumentForFindMethod(tmpMolecule));
+        ErtlFunctionalGroupsFinder tmpEFGF = ErtlFunctionalGroupsFinderUtility.getErtlFunctionalGroupsFinderGeneralizingMode();
+        List<IAtomContainer> tmpFGList = tmpEFGF.find(tmpMolecule);
+        for (IAtomContainer tmpFG : tmpFGList) {
+            System.out.println(ErtlFunctionalGroupsFinderUtility.createPseudoSmilesCode(tmpFG));
+        }
+    }
+
+    /**
+     * Tests the extraction of only atoms marked by the Ertl algorithm as functional groups, implemented in
+     * ErtlFunctionalGroupsFinderUtility as a third option to "full environment" / "generalized environment".
+     *
+     * @throws Exception if anything goes wrong
+     */
+    @Test
+    public void testFindMarkedAtoms() throws Exception {
+        SmilesParser tmpSmiPar = new SmilesParser(DefaultChemObjectBuilder.getInstance());
+        //CHEMBL1201736
+        IAtomContainer tmpMolecule = tmpSmiPar.parseSmiles("CO/N=C(\\C(=O)N[C@@H]1C(=O)N2C(C(=O)[O-])=C(C[N+]3(C)CCCC3)CS[C@H]12)c1csc(N)n1.Cl");
+        tmpMolecule = ErtlFunctionalGroupsFinderUtility.applyFiltersAndPreprocessing(tmpMolecule, Aromaticity.cdkLegacy());
+        List<IAtomContainer> tmpFGList = ErtlFunctionalGroupsFinderUtility.findMarkedAtoms(tmpMolecule);
+        List<String> tmpPseudoSmilesList = new ArrayList<>(6);
+        for (IAtomContainer tmpFG : tmpFGList) {
+            String tmpPseudoSmiles = ErtlFunctionalGroupsFinderUtility.createPseudoSmilesCode(tmpFG);
+            System.out.println(tmpPseudoSmiles);
+            tmpPseudoSmilesList.add(tmpPseudoSmiles);
+        }
+        Assert.assertTrue(tmpPseudoSmilesList.contains("[N]C(=O)[C]=N[O]"));
+        Assert.assertTrue(tmpPseudoSmilesList.contains("[C]=C(C(=O)[O])N([C]=O)[C][S]"));
+        Assert.assertTrue(tmpPseudoSmilesList.contains("[N]"));
+        Assert.assertTrue(tmpPseudoSmilesList.contains("[S*]"));
+        Assert.assertTrue(tmpPseudoSmilesList.contains("[N*]"));
+        Assert.assertTrue(tmpPseudoSmilesList.size() == 6);
     }
 }
