@@ -1,10 +1,8 @@
 /*
- * Test of Utilities for
- * ErtlFunctionalGroupsFinder for CDK
+ * Test of Utilities for ErtlFunctionalGroupsFinder for CDK
  * Copyright (C) 2021 Jonas Schaub
  *
- * Source code is available at <https://github.com/JonasSchaub/Ertl-FG-for-COCONUT>
- * ErtlFunctionalGroupsFinder for CDK is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
+ * Source code is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -20,11 +18,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.openscience.cdk.tools.test;
-
-/**
- * TODO:
- * -
- */
 
 import org.junit.Assert;
 import org.junit.Test;
