@@ -24,7 +24,6 @@ package de.unijena.cheminf.ertlfgforcoconut;
 
 /**
  * TODO:
- * - Update to more recent version of COCONUT
  * - Find a way to print non-String value fields of the documents
  */
 
@@ -75,7 +74,7 @@ public class CreateCoconutSdfTest {
     /**
      * Name of the MongoDB database
      */
-    private static final String DATABASE_NAME = "COCONUTfebruary20";
+    private static final String DATABASE_NAME = "COCONUT_2021_03";
 
     /**
      * Collection from the database to load
@@ -135,10 +134,11 @@ public class CreateCoconutSdfTest {
         System.out.println("Connection to MongoDB successful.");
         System.out.println("Collection " + CreateCoconutSdfTest.COLLECTION_NAME + " in database " + CreateCoconutSdfTest.DATABASE_NAME + " is loaded.");
         String tmpOutputFolderPath = (new File(CreateCoconutSdfTest.OUTPUT_FOLDER_NAME)).getAbsolutePath() + File.separator;
+        File tmpOutputFolder = new File(tmpOutputFolderPath);
         System.out.println("Output directory: " + tmpOutputFolderPath);
         File tmpOutputFile = new File(tmpOutputFolderPath + CreateCoconutSdfTest.OUTPUT_File_NAME);
-        if (!tmpOutputFile.exists()) {
-            tmpOutputFile.mkdirs();
+        if (!tmpOutputFolder.exists()) {
+            tmpOutputFolder.mkdirs();
         }
         FileOutputStream tmpFileOut = new FileOutputStream(tmpOutputFile);
         SDFWriter tmpWriter = new SDFWriter(tmpFileOut);
@@ -165,8 +165,15 @@ public class CreateCoconutSdfTest {
             try {
                 tmpCurrentDoc = tmpCursor.next();
                 tmpMoleculeCounter++;
+                if (tmpMoleculeCounter % 10000 == 0) {
+                    System.out.println(tmpMoleculeCounter + " molecules processed so far...");
+                }
                 tmpID = tmpCurrentDoc.getString(CreateCoconutSdfTest.ID_KEY);
                 tmpSmilesCode = tmpCurrentDoc.getString(CreateCoconutSdfTest.SMILES_CODE_KEY);
+                if (Objects.isNull(tmpSmilesCode)) {
+                    tmpFilteredCounter++;
+                    continue;
+                }
                 tmpMolecule = tmpSmiPar.parseSmiles(tmpSmilesCode);
                 if (Objects.isNull(tmpMolecule)) {
                     tmpFilteredCounter++;
@@ -189,6 +196,7 @@ public class CreateCoconutSdfTest {
         System.out.println("Filtered counter: " + tmpFilteredCounter);
         tmpWriter.close();
         tmpLogFileHandler.flush();
+        tmpLogFileHandler.close();
         tmpCursor.close();
     }
     //</editor-fold>
