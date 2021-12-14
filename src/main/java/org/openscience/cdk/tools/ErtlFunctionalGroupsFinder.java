@@ -19,6 +19,13 @@
  */
 package org.openscience.cdk.tools;
 
+/**
+ * IMPORTANT NOTE: This is a copy of
+ * https://github.com/zielesny/ErtlFunctionalGroupsFinder/blob/master/Basic/ErtlFunctionalGroupsFinder.java
+ * Therefore, do not make any changes here but in the original repository!
+ * Last copied on December 14th 2021
+ */
+
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
