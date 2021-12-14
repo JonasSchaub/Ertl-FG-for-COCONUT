@@ -2,7 +2,7 @@
  * Uses
  * ErtlFunctionalGroupsFinder for CDK
  * to extract functional groups from a database of natural products
- * Copyright (C) 2020 Jonas Schaub
+ * Copyright (C) 2021 Jonas Schaub
  *
  * Source code is available at <https://github.com/JonasSchaub/Ertl-FG-for-COCONUT>
  * ErtlFunctionalGroupsFinder for CDK is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
