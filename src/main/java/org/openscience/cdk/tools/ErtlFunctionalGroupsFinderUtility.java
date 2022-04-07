@@ -1,6 +1,6 @@
 /*
  * Utilities for ErtlFunctionalGroupsFinder for CDK
- * Copyright (C) 2021 Jonas Schaub
+ * Copyright (C) 2022 Jonas Schaub
  *
  * Source code is available at <https://github.com/zielesny/ErtlFunctionalGroupsFinder>
  *
@@ -20,7 +20,6 @@
 package org.openscience.cdk.tools;
 
 import org.openscience.cdk.CDKConstants;
-import org.openscience.cdk.DefaultChemObjectBuilder;
 import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
 import org.openscience.cdk.exception.CDKException;
@@ -676,7 +675,7 @@ public class ErtlFunctionalGroupsFinderUtility {
      * functional group with the carbon IAtom objects from the original molecule object.
      * <br>Important note: This method only works if the atom container has not been cloned for the extraction of
      * functional groups by ErtlFunctionalGroupsFinder. Use the method
-     * "List<IAtomContainer> find(IAtomContainer container, boolean clone)" with clone set to false for this purpose.
+     * "List{@literal <}IAtomContainer{@literal >} find(IAtomContainer container, boolean clone)" with clone set to false for this purpose.
      * <br>Also note that the result differs if the environment has been generalized by the EFGF or not. In the former
      * case, only environmental carbon atoms replaced by R-atoms in the generalized FG are restored.
      *
@@ -686,6 +685,7 @@ public class ErtlFunctionalGroupsFinderUtility {
      *                                  hydrogens
      * @param aFillEmptyValences should empty valences on the restored environmental carbon atoms be filled with
      *                           implicit hydrogen atoms
+     * @param aBuilder a chem object builder instance
      * @throws NullPointerException if a parameter is null
      * @throws IllegalArgumentException if one of the functional groups does not originate from the given molecule
      *                                  or the molecule has been cloned for the extraction of functional groups
@@ -695,11 +695,13 @@ public class ErtlFunctionalGroupsFinderUtility {
             List<IAtomContainer> aListOfFunctionalGroups,
             IAtomContainer aMolecule,
             boolean aConvertExplicitHydrogens,
-            boolean aFillEmptyValences)
+            boolean aFillEmptyValences,
+            IChemObjectBuilder aBuilder)
             throws NullPointerException, IllegalArgumentException {
         //<editor-fold desc="Parameter checks">
         Objects.requireNonNull(aListOfFunctionalGroups, "Given list of functional groups is null.");
         Objects.requireNonNull(aMolecule, "Given molecule is null.");
+        Objects.requireNonNull(aBuilder, "Given chem object builder is null.");
         if (aListOfFunctionalGroups.isEmpty()) {
             return;
         }
@@ -719,7 +721,7 @@ public class ErtlFunctionalGroupsFinderUtility {
             }
         }
         //</editor-fold>
-        CDKHydrogenAdder tmpHadder = CDKHydrogenAdder.getInstance(DefaultChemObjectBuilder.getInstance());
+        CDKHydrogenAdder tmpHadder = CDKHydrogenAdder.getInstance(aBuilder);
         for (int i = 0; i < aListOfFunctionalGroups.size(); i++) {
             IAtomContainer tmpFG = aListOfFunctionalGroups.get(i);
             //convert explicit hydrogens to implicit
