@@ -1,6 +1,7 @@
 # Ertl Functional Groups for the COlleCtion of Open NatUral producTs (COCONUT)
 ## Ertl-FG-for-COCONUT
-The algorithm for automated functional groups detection and extraction of organic molecules 
+:warning:Legacy code, not actievely maintained:warning:
+<br>The algorithm for automated functional groups detection and extraction of organic molecules 
 [developed by Peter Ertl](https://doi.org/10.1186/s13321-017-0225-z) and implemented on the basis of the 
 Chemistry Development Kit (CDK) by Fritsch et al. ([ErtlFunctionalGroupsFinder](https://doi.org/10.1186/s13321-019-0361-8)) 
 is used to supply information about functional groups for the COlleCtion of Open NatUral producTs (COCONUT) [compiled 
